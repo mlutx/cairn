@@ -6,6 +6,7 @@ __pycache__/
 # C extensions
 *.so
 
+backend-env/
 # Distribution / packaging
 .Python
 build/
@@ -68,6 +69,9 @@ instance/
 # Scrapy stuff:
 .scrapy
 
+# Dump
+dump.rdb
+
 # Sphinx documentation
 docs/_build/
 
@@ -127,8 +131,15 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# cairn specific files
+agent_history_dumps/
+.cairn/
+
 # Environments
 .env
+.env.local
+.env.prod
+*.pem
 .venv
 env/
 venv/
@@ -136,9 +147,12 @@ ENV/
 env.bak/
 venv.bak/
 
+node_modules/
 # Spyder project settings
 .spyderproject
 .spyproject
+
+.DS_Store
 
 # Rope project settings
 .ropeproject
@@ -172,3 +186,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+# Sqlite
+*.db*

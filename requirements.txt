@@ -1,0 +1,17 @@
+pydantic
+langchain-core
+langgraph
+python-dotenv
+PyJWT
+cryptography
+python-dateutil
+diff-match-patch
+fuzzywuzzy
+voyageai
+python-levenshtein
+pinecone
+supabase
+google-genai
+redis
+fastapi
+uvicorn[standard]
