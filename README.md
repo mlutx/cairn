@@ -161,6 +161,10 @@ COMING SOON
 
 ---
 
+### Demo
+
+![Cairn Demo](static/docs/images/demo1.gif)
+
 ### Your First Task
 
 1. **Access the interface** (web or terminal)
