@@ -11,7 +11,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688.svg)](https://fastapi.tiangolo.com/)
 [![Contributing](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](.github/CONTRIBUTING.md)
 
-[🚀 Quick Start](#-quick-start) | [📖 Documentation](https://try-cairn.com) | <span style="margin-left:-5px">[<img src="https://logos-world.net/wp-content/uploads/2020/12/Discord-Emblem.png" alt="Discord" width="30" height="15" style="position:relative; top:3px; margin-right:-7px;"/> Discord](https://discord.gg/C67EdrKN)</span> | [🐛 Issues](https://github.com/cairn-dev/cairn/issues) | [🤝 Contributing](.github/CONTRIBUTING.md)
+[🚀 Quick Start](#-quick-start) | [📖 Documentation](https://try-cairn.com) | [<img src="https://logos-world.net/wp-content/uploads/2020/12/Discord-Emblem.png" alt="Discord" width="30" height="15" style="position:relative; top:3px; margin-right:-7px;"/> Discord](https://discord.gg/C67EdrKN) | [🐛 Issues](https://github.com/cairn-dev/cairn/issues) | [🤝 Contributing](.github/CONTRIBUTING.md)
 
 </div>
 
