@@ -1,0 +1,459 @@
+{
+    "messages": [
+        {
+            "role": "system",
+            "content": "\n    You are an Expert Software Engineer tasked with implementing code changes according to specific instructions.\n    You use chain of thought reasoning to figure out how to implement the changes quickly and efficiently, then generate an output with summarized changes.\n\n    1. Your specific task instructions from your Product Manager will be provided as a separate message.\n\n    2. Focus on providing thoughtful analysis:\n     <analysis_instructions>\n     - You are using chain of thought reasoning. As part of this, you should maintain a running list of your thoughts and learnings, by putting them inside <analysis> tags.\n     - You should look at the previous analysis tags to understand what you have done so far, then summarize previous learnings, next steps, and new learnings inside your <analysis> tags.\n     - Use bullet points to summarize previous knowledge, next steps, etc. Be extremely detailed. It is okay for your analysis to be very long.\n       - For example, if the previous analysis tags said you should read a file, and the previous tool call was to read the file, then in your analysis tags you should include that you have read the file and a brief summary.\n     - Based on your previous actions, results, and any new thoughts, you should choose the most appropriate tool to use.\n     </analysis_instructions>\n\n    After your analysis, you should select the most appropriate tool for the current step in solving the task.\n\n    3. The repositories you have access to are:\n    <available_repos>\n    test\n    </available_repos>\n\n    4. Information about other agents who may be working on related tasks:\n    <other_agents_info>\n    No other agents are currently working on related tasks.\n    </other_agents_info>\n\n    5. Making code changes:\n    <code_change_instructions>\n\n    5.1 Overview of the two edit file tools (edit_file and edit_file_descriptively).\n    - use the edit_file tool when you want to make quick changes in the form of a unified diff.\n    - use the edit_file_descriptively tool when you want to make more detailed changes, full file rewrites, or when the edit_file tool is not sufficient.\n\n    5.2 Details on using the edit_file tool:\n      Each call to the edit_file tool must include the following keys:\n      - file_path (str, required): the path to the file to edit\n      - unified_diff (str, required): a single unified diff string to apply to the file.\n          - Unified diffs start with a hunk header: @@ -<start_old>,<len_old> +<start_new>,<len_new> @@\n          - Lines starting with '-' indicate deletions\n          - Lines starting with '+' indicate additions\n          - Lines starting with ' ' (space) indicate context (unchanged lines)\n\n      You can optionally include the following keys:\n      - create_file (bool, optional): a boolean to indicate if you want a new file created with blank content. You can also do this by setting unified_diff and file_path to a new file path.\n      - delete_file (bool, optional): a boolean to indicate if the file should be deleted in entirety.\n\n      5.2.1 Examples of unified diff tool calls. The unified diff can be as long as you want. Including content (unchanged lines) can be useful to help the tool apply the diff correctly.\n      <example_unified_diff_tool_calls>\n        1. Adding new lines to a file (Python):\n          {\n            \"file_path\": \"src/utils.py\",\n            \"unified_diff\": \"@@ -10,6 +10,9 @@\n def existing_function():\n     # Some existing code\n     return result\n+\n+def new_function():\n+    return 'This is a new function'\n \n # More existing code\"\n          }\n\n        2. Modifying existing lines (TypeScript):\n          {\n            \"file_path\": \"src/services/userService.ts\",\n            \"unified_diff\": \"@@ -15,7 +15,7 @@\n class UserService <bracket>\n   private logger: Logger;\n   private timeout: number;\n-  constructor(private apiClient: ApiClient, timeout: number = 30) <bracket>\n+  constructor(private apiClient: ApiClient, timeout: number = 60) <bracket>\n     this.logger = new Logger('UserService');\n     this.timeout = timeout;\n   </bracket>\"\n          }\n\n        3. Deleting lines (React/JSX):\n          {\n            \"file_path\": \"src/components/DataDisplay.jsx\",\n            \"unified_diff\": \"@@ -22,9 +22,6 @@\n   const processData = (data) => <bracket>\n     // Process the data\n     const result = transform(data);\n-\n-    // This debug code is no longer needed\n-    console.log('Debug:', result);\n \n     return result;\n   </bracket>;\"\n          }\n\n        4. Creating a new file with content (Markdown):\n          {\n            \"file_path\": \"docs/CONTRIBUTING.md\",\n            \"unified_diff\": \"# Contributing Guidelines\n\n## Getting Started\n\nThank you for considering contributing to our project!\n\n### Prerequisites\n\n- Node.js (v14 or higher)\n- npm or yarn\n\n### Setup\n\n1. Fork the repository\n2. Clone your fork: `git clone https://github.com/yourusername/repo.git`\n3. Install dependencies: `npm install`\"\n          }\n\n          OR (if you want to create a new file with blank content)\n\n          {\n            \"file_path\": \"docs/CONTRIBUTING.md\",\n            \"create_file\": true\n          }\n\n        5. Using a large unified diff for multiple changes (JSON):\n          {\n            \"file_path\": \"config/settings.json\",\n            \"unified_diff\": \"@@ -5,6 +5,11 @@\n   \"environment\": \"development\",\n   \"logLevel\": \"debug\",\n   \"database\": <bracket>\n+    \"host\": \"localhost\",\n+    \"port\": 5432,\n+    \"username\": \"admin\",\n+    \"password\": \"secure_password\",\n+    \"name\": \"app_db\"\n   </bracket>,\n@@ -25,6 +30,10 @@\n   \"api\": <bracket>\n     \"baseUrl\": \"http://localhost:8000\",\n     \"timeout\": 30000\n+  </bracket>,\n+  \"cache\": <bracket>\n+    \"enabled\": true,\n+    \"ttl\": 3600\n   </bracket>\n </bracket>\"\n          }\n\n        6. Deleting a file (CSS):\n          {\n            \"file_path\": \"src/styles/deprecated/old-theme.css\",\n            \"delete_file\": true\n          }\n        </example_unified_diff_tool_calls>\n\n    5.3 Details on using the edit_file_descriptively tool:\n\n        Use the edit_file_descriptively tool to make code changes using natural language, code snippets, and comments.\n        This tool takes partial edits in the form of code snippets in the context of the original file, and applies them to the full file.\n\n        Each call to the edit_file_descriptively tool must include the following keys:\n        - file_path (str, required): the path to the file to edit.\n        - edit (str, required): a string containing your edit suggestions with code snippets showing exactly what the new code should look like.\n\n        Key guidelines for edits:\n        - Use \"// ... existing code ...\" (or equivalent comment syntax based on the language) to represent unchanged code, explain where to add your code, etc.\n        - Avoid including excessive unchanged code, but some unchanged code can be useful to inform where to apply the changes.\n        - You can include multiple code chunks in your suggestions, but make sure to include the context for where to apply the change.\n        - The tool will intelligently apply your changes while preserving the rest of the file.\n        - Be specific about what changes you want to make and provide clear context and good code snippets and comments.\n\n        6.3.1 Examples of edit_file_descriptively tool calls:\n        <example_edit_file_descriptively_tool_calls>\n\n        1. Adding a new function to a Python file:\n          {\n            \"file_path\": \"src/utils.py\",\n            \"edit\":   \"Add a new function called validate_email after the existing helper functions:\n\n                      // ... existing helper functions ...\n\n                      def pull_user_data(user_id: str) -> dict:\n                          // existing code ...\n\n                      //  adding this function after the helper functions\n                      # this function will validate an email address\n                      def validate_email(email: str) -> bool:\n                          import re\n                          pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'\n                          return re.match(pattern, email) is not None\n\n                      // ... existing code ...\"\n          }\n\n        2. Adding imports and updating a React component:\n          {\n            \"file_path\": \"src/components/DataDisplay.jsx\",\n            \"edit\":\"Add useState and useEffect imports, and update the component to fetch data:\n\n                    import React, { useState, useEffect } from 'react';\n                    // ... other existing imports ...\n\n                    // ... existing code ...\n\n                    const DataDisplay = () => {\n                      const [data, setData] = useState(null);\n                      const [loading, setLoading] = useState(true);\n\n                      useEffect(() => {\n                        const fetchData = async () => {\n                          try {\n                            const response = await fetch('/api/data');\n                            const result = await response.json();\n                            setData(result);\n                          } catch (error) {\n                            console.error('Error fetching data:', error);\n                          } finally {\n                            setLoading(false);\n                          }\n                        };\n\n                        fetchData();\n                      }, []);\n\n                      if (loading) return <div>Loading...</div>;\n\n                      // ... rest of existing component code ...\"\n          }\n\n        3. Creating a new file:\n          {\n            \"file_path\": \"src/config/config.ts\",\n            \"edit\":\"Create a new configuration file with the following content:\n                    export const config = {\n                      apiUrl: process.env.REACT_APP_API_URL || 'http://localhost:8000',\n                      timeout: 30000,\n                      retries: 3\n                    };\n\n                    export default config;\"\n          }\n\n        </example_edit_file_descriptively_tool_calls>\n\n\n    5.4 Code Change Failures:\n    - If a code change fails to apply, analyze the error and try a different approach, such as using the edit_file_descriptively tool instead of the edit_file tool.\n    - If multiple attempts fail, break down the change into smaller steps.\n    - Document failed attempts and their error messages in your analysis.\n\n    5.5 Integration Issues:\n    - If changes conflict with other components, analyze dependencies using the substring_search tool. For example, if you modify a function used in other files, you can search the function's name to find which files you mind have to adapt to the new function change.\n    - Document integration points and potential conflicts\n    </code_change_instructions>\n\n    6. Error Recovery and Handling:\n    <error_handling>\n    6.1 Read file errors:\n    - If you are unable to read a file, it is often because your path is wrong.\n\n    6.2 Code search error:\n    - If you search the codebase by a code snippet using the substring_search tool and no results are found it may be because the code snippet is not in the codebase, or because the codebase isn't indexed (in which case try another approach).\n\n    6.3 Tool failures:\n    - If a tool call fails, analyze the error and try an alternative approach.\n    </error_handling>\n\n    7. Instructions for completing your task:\n    <task_completion_instructions>\n    7.1 Analyze the task and codebase if not done already:\n    - Use the view_repository_structure tool to understand the codebase organization, or if given files by the input, use the read_file tool to understand the codebase organization.\n    - Examine the specific task requirements carefully.\n        - If the input specifies a format or structure for the output, make sure to follow it.\n\n    7.2 Tool Usage & Efficiency Considerations:\n    - Use the multi_tool_call tool to compress your reasoning. For example, you can read multiple files at once, or list multiple directories at once, or read a file while listing a directory, etc. This is better than making one tool call at a time when you can do multiple.\n    - Focus on efficiency and speed in your reasoning. You shouldn't read all the files.\n    - The view_repository_structure tool is usually better than listing files in a directory.\n\n    7.3 Make code changes:\n    - Implement precise, minimal changes that address the task requirements using the edit_file tool or the edit_file_descriptively tool.\n    - Maintain existing code style and patterns.\n    - If changes weren't applied correctly, try again with a clearer approach.\n    - You can make multiple edits before completing the task.\n    - Focus on solving the specific task without introducing unnecessary changes.\n    - Be careful about dependencies. Use the substring_search tool to help figure out what files are affected by your changes.\n\n    7.4 Coordinate with other agents (if applicable):\n    - Use the spy_on_agent tool to view logs and progress of other agents (provide the agent ID).\n    - Use the message_agent tool to communicate with them (provide agent ID and message).\n    - This is especially useful for coordinating between frontend and backend changes.\n        - You only need to use this if the data formats and whatnot were not sufficienyly specified in the input.\n\n    7.5 Complete the task:\n    - When you're ready to complete the task, use the generate_output tool to summarize your changes.\n\n    7.6 Before providing your response, wrap your thought process and planning inside <analysis> tags. This should include:\n    - A breakdown of the specific task requirements\n    - A list of the tools you might need to use and why\n    - A step-by-step plan for approaching the task\n\n    This will help ensure a thorough approach to the task.\n    </task_completion_instructions>\n\n    \n\n    \n    <repo_memory_instructions>\n    You additionally have the ability to preserve some memory of the current repository.\n    This can help future agents understand the repository and its structure more efficiently.\n    To do this, in addition to your <analysis> tags, you can also use the <repo_memory> tags.\n\n    Here is an example output:\n        <analysis>\n        [YOUR ANALYSIS HERE]\n        </analysis>\n        <repo_memory>\n        - this repo contains a frontend and backend.\n        - the frontend is a react app located at /client/\n        - the backend is a fastapi app located at /backend/fastapi_app/\n        - the backend fastapi app has a routes directory at /backend/fastapi_app/routes/ that contains the routes for the api endpoints.\n        - the frontend uses vite to build the app.\n        </repo_memory>\n\n    The current repo has no available memory, so after you gain the necessary knowledge you should generate a repo memory using the <repo_memory> tags.\n    </repo_memory_instructions>\n    \n    "
+        },
+        {
+            "role": "user",
+            "content": "please try the web search tool, then the view repository tool, then the list files in directory tool, then terminate by calling generate output with any data."
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "I'll execute the requested tools in order. Let me start with the web search tool, then explore the repository structure, list files, and finally generate output.\n\n<analysis>\nThe user has requested a specific sequence of tool calls:\n1. Web search tool\n2. View repository structure tool\n3. List files in directory tool\n4. Generate output with any data\n\nThis seems to be a test of the available tools rather than a specific code implementation task. I'll execute each tool in order and then summarize the results.\n</analysis>Now let me view the repository structure:"
+                },
+                {
+                    "type": "tool_use",
+                    "id": "srvtoolu_01HcmCKbYqdH64T9gDb7RAQ4",
+                    "name": "web_search",
+                    "input": {
+                        "query": "software development best practices"
+                    }
+                },
+                {
+                    "type": "tool_use",
+                    "id": "toolu_01CAJzyNVfZGYo26nNPPEC4s",
+                    "name": "view_repository_structure",
+                    "input": {
+                        "max_depth": "5"
+                    }
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "srvtoolu_01HcmCKbYqdH64T9gDb7RAQ4",
+                    "content": "{\n  \"query\": \"software development best practices\",\n  \"results\": [\n    {\n      \"title\": \"11 Software Development Best Practices in 2024\",\n      \"url\": \"https://www.netguru.com/blog/best-software-development-practices\",\n      \"encrypted_content\": \"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\",\n      \"page_age\": \"November 16, 2024\"\n    },\n    {\n      \"title\": \"Standards in software development and 9 best practices\",\n      \"url\": \"https://www.opslevel.com/resources/standards-in-software-development-and-9-best-practices\",\n      \"encrypted_content\": \"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\",\n      \"page_age\": null\n    },\n    {\n      \"title\": \"Coding best practices - Wikipedia\",\n      \"url\": \"https://en.wikipedia.org/wiki/Coding_best_practices\",\n      \"encrypted_content\": \"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\",\n      \"page_age\": \"April 24, 2025\"\n    },\n    {\n      \"title\": \"Atlassian's Guide To Modern Software Development | Atlassian\",\n      \"url\": \"https://www.atlassian.com/software-development/practices\",\n      \"encrypted_content\": \"EooJCioIBBgCIiRmY2JiZWJiNC0yNjUzLTQ1OGEtYjhkMC1mMjY5NzhjMGFhYjISDH6b3ow8Hntbjn3n4BoMSh1DOl1ogULdtsV3IjBPU/vRl3ukA/5A3NokWgqVOzbdPnvx0YJD8WszBPid52/yaDbFQh/HT4q0LwO9qyEqjQhXDKAxe8mrdrZltuZvatMZoZA3uDxq5PONr2Ix7oXv4NTfYQNgzyxjsEAyR2m1fDa7fZ6mSVzTgwCDyspnFKb0+T53uqUv2UHF8xwvBIXUrXgh29ULAbCvQeKLH84VbygBvrgRvaAWHz84UGOeQW7edEX4EJDapb8/5bcl0f17HGB3B9OIAQjDhWPAogDXvJZqZpmOW/tpuI3jMEbMHtwNeOX3c3dIrySK365muVPiddPBze3GzyZ+t2qQeIp0hcBTACLHoxzAeXpN3MpVgOtSyGCmQHufK7ZEfUuC9N3Lg1SOeVcNAFcwqeQJczYt8SoWkPewU6Vepi0+BwrKbB+YG0k6eZaMhDLu5yXt7xidRU9Wt9MU6BWsNOIEelScwb+JDOr4soLa66VxYnaTrjgkwPZib1ukq7lc2FukIgebM9cSP1V+tNHPqvscsABkwVNJpIc0IgeV5meY31zc07DgZGKS6IUnieTTwUq4nBwJmwouk0k6yTQIQkGTZvazIdojAIlIveiqZ4isr8aL4hMgWtx0vZgeO2sVW2rEGMSPZ52Pk7HcFUCv3j8+7LggwVWzFL1Pj0kTWreYTGw4CpSCCx1oAl8TK+c/zJiB9s1F10NM4DMTA3/67Z0jLVU3S/u5JiQpZNNa+QgTF/djk13C88TrKJaLTuAfCd6bX9wZGpuonCUWaOnFUJ2o5OZfWbI+5c5AcwInHc3enK6bGIoXUlDvnKw+WjbRvUDNdC/cww63wInlBF46TXAp4CDiL8zxExuPqv+pwxeWHFsPTwfKJtdHcEpAHKjQcLbZLSwpvS4IgwV0AatJ76dr0I4iQP2Dcu8E0sGhKUiZxDiLtS2rReBU6gcsqYlsmflOlonTBRvOzLbvxahxM3s2sAXgGwC5imAp08a70dAz1sQ1X/KRJQe8KjOwzCy59J00uoO72C4yv2egWhHSLeNVoWGFZ+E/jiFA128JF5PL/2EFW0lLQaLnfRfgp+7fn1CmRaPPZBu+TG+OzsVSyj1k5sI43f0LRWHyDYh2vfMwmI2wqjHrCw40qayIcTUnc2qmTK4WQ7cajtcj3TbAaj0zZcle2Smh6uxoz/+NQpYoBe1lHmUXsTZPSSGOaNtTiymdZZsbQkCaNyTv2LFAkZhAW2EmWEaYrMGe1n/dBGqe+JUK2kLUBb3iOqXrAD9LZj6Ro+7zzZBE8dO3UHy1fD7TOZEyrUp8sy955wpAUGhb67FzqOzwNk6AenOvnQQnIyO+DA7sNmvQ02/WHgiuM7ikRljpr5VZudbGW+wlGeN17ItXn0FXDaV3tz2w1H/ZGzC2Fc6yMDo4uE4hupDzPXcLkBf8gc4EXnAvn+C/4HNMdBT5qEwqWMGlBnBO2WKOcg4FDxgD\",\n      \"page_age\": null\n    },\n    {\n      \"title\": \"Best Practices in Developing Programs\",\n      \"url\": \"https://www.cs.utexas.edu/~mitra/csSummer2014/cs312/lectures/bestPractices.html\",\n      \"encrypted_content\": \"Ev4TCioIBBgCIiRmY2JiZWJiNC0yNjUzLTQ1OGEtYjhkMC1mMjY5NzhjMGFhYjISDDyEpmDih5PBckzg2xoMMsBLEP1l1/w4Ljz4IjDB6ozLPKHuKMXiV4plfbUmzsC3+pnrgEeCy/dw9myrfjlMiT9XfYA+sjwst7zc/d8qgRO7fpcHOyzpB/cPVlqSabyHvJz1lA1kuGG0PsNXFTR3Q2jn++uNMf6z0r1M3VNULhir+RPgWkHOOr9jZ86fePBS3SeteLo5+eVgsCEBHaiXu6vhkr/p98Kl1+CH0H1FvP/zdB9ehWrC82zTL86ATgPFjXhPXCp2/wgT3SdB86yuv/bfS/Bj08d6iBwKuBPbhDbKaOC1YfT2ntkczLc5pMNFE+QA3jRC8QzrC5hqRVS6zqz/AAcDbJhALFkhVoFkwdTH/qt+gF6Nb6U8k0yh0CuH2P4icLBUfEfUwUhRobnEiDO/FduHvE675r+pF5Tn0DT5BoIJoJ8WSJVhN2g45lWWiZl6UlusvVLJqveBzKKm0sG0u2qw4B1pXRC9BIOAs+WS6axx0/GwRuAWlkL0+R0oiit56hUYQFxgNKNf1T3QOcfeX4TxvNETMr0wl5yy9AadR/1gIai+VA4cnyhl9si/cGduFOenFwTypcZt5q+SXMgbBNeCostU907PGgAW6GSICZhF2jzbChbVhhDwpDoVCO4ADKmrSSTkIxN9P+lrdlrPMPmfcHzxVSdXIcJfXuJnlNLxetWIJOV5uk8suJn8AC30uEYzxPwCwPfLr4xni/XczAcalpXOoAzrrRuEGlDokllJ1mf7xCKoAGL4451c5yrkFUxiCgJtcLrGnIkA4e3aQLaz0b6sAidRLXbgcO/EsbkxPutdLAhJ13K1h0z2sADSm7pIozy4LxWvqqPQEKXWJr8YBVQop9B30HPz5MT/79uMrbzj/8ldPK+fcXrcZe6YpMpGkJJaZsDEpVXzR/K6hn2DgcKckbSTzvGaFlSJFedmeNfaz32RtDGVuWqOl+zAx3ExzZy0zAFqzp9wCTXsuj5s/UpEJjaH/alOgxl3KvALEeq/Bl5LikYLIRiNkbsZIN5mYteyu32DhQ1b1u22GC3WbS9VlriGbOGzC8+s+B8r6xdABPNUvIADjkTmSlwxwoT4uSl4cfYilGYJIudXgrql4f5iAYvzJEEYxA0H43AOIGRHjFRbNWZG+cznQXsbyEzfMs33XSqsNtF9UtoepRNgRWXnIDxwv07B6nJb5lAB7rgCWBNs6vIkAxvw/Cu0Usy2QBRH8PIWgOfWecD0b7oLU3+x+q7c1f428n2JySol8NcKJE5skRoQGfoQ3n1NtuiR82cpNKM2PGF1egs9aY8s5bVk9/AiaJqG9ETReRVRJhmyPu8zzWrCirT6H/ignAAE+/cvyiFaVG9OI5konRUhMGZXzE7xuEoTOSUFuiSCw+yoXJZhzw73F4/svV2w+wvWeirRqyvOKx5jcpTMP+ThF1/+UKLZo0RDLA7+iKczBUW6TK5+87lVg38Y2Wy1wU5bIHWvz3MjT71Lmbgz6O0E6BXoiabqLz1+wzGbfad4sVC9EjJkQ5eocTyR48V+gwPo9DaREIcuPEoVQTrV0SVHXyuPmyO+zpzYw88qHYD1aaoIp1qpvwDfINZ6x9QszsIbiEWy3nqb4PWGZ6UkNXhtoxubY8LIEIOsEHFHNpPBqtH/wd2qPLwgb5Tqhx5hbCnaZ1UXvKjHUd9IzLRFVBmSZvWXfZPn8lMQE8jyDc41zxn2C6UftF5iqx60DnryAi8v+zWnhA/DbthWvShGIkVaCW28Xeqau4AxzB1cJOKTz5rIJKmhQoYpueeKOuU6wdYgKfocj0K1V9SYwiQMjgquH3zv8E+10e6x+EMBx1yKZSh19Own3BHWmE3Fo+i+WzLc59n5UhlLtTnHvVnoipOyC4jcngdsY+C6epgCEHQG7xktWLAo6U2r3nQHXUJ5fYRsUEdBrohKFosh5gx5iI2TYz51yusKCbKBrnwfiz37+WFzBKvRFbhyUS37a+61L9+aPA/Yr6dEFRhanaqqgrtU0XVEOOwUQh1eJYLvbK8zWhbjJY8ek0bnHrD7nIZHAor5ax1O611x4Q8kTo8yNoEz/uZuG1ARl/8dbFtUrmv+rlE6B9+iBovVpcFIAcRU9Rt1G6i8gEe80tBss94/bxoskLRSOdNljEoEz3HJLalbRbj/3JlC4sNTiCjTfAP6nPNo4qTwraH9c1z78GKxg+O5aV29AOu6hepuyM7pNFXaaAhIKhDRWHY1EszGv0mUUQ6fCuiQNblSEIaWoTQAErNoelnqigbmMvg4XknSJQ8mrNRBhIhi3JdlgcLYGYOVbh9P7wXp/N2elm1hEQpTdtJ/4fy+VzRzn0MdKAaU8OcWXm6B9uDblUzopp8e6j2UPUKJBILS0eguZTRPQEGszUGSjerJuX2I/bcZbI4vJMkZGvf3BztodxQb9GnMJbJPTKZfJgD0DTKX1lRyPTGi2RIr5aG9jtr3+E/8SZnndAhwlCE4mnqFEzqQ7BPVmCWjs75kiUTfMhpeNObPuk8zE2pgOaPXakSw3AIHmSwgWCsJx4lcWrQZHHGaSXplEzy8e3vWwRF5mA1upWCrE24WUaQBteG0ofbk/B4yZ6DjYr9MwgLOy/HVD+EQPMIWwolKLb4UkG0rpWYZFRpkes0TI41AIauKvZcgAIbVWDPXacYb41R4bct1yrjjw26aHjqBG2xpMz48i9Hkk4DuJ5Iv7wp+9hznzlGEnSQxGvo+MujK6iif0NjgYKQWJwVVTSj2070VdWJDJ2yccpFxRkA5EjqRbdorZSL/peZHMomrCCrQ/ZATubOZr8kjKXLp+kYx1QG6TCJPEQKAMETFdKgySrwDrAAXkO2GGPfHvY2VYs/S7zquGpVGro4DmlS6IkowWCHE7PTiVMo133pjEPJPPdCiQuVTGrP5KM6/dNUKG78gAZ9W/Rw0NjO66JoID5UGdyS98PrUThKwzWVFRT00mJdAd4tYp1B/2Imr46a+LypglM3efNCVavtTqDitdoV1Qeb9vSZN14bQxfUMuoGHD738w5GX8iZ9obyGe0HcihltZwQNofCwVpjs6dSsPaihhQ/LJ9BawHYuj4sXEJynS3X6J/rzBBobb7pbQpvi5ui//9oopMYu10LkIumq1TnKAdIqjXy6vVdIDP4TlGjIDjLBUFd07vF9GX4iHyz3s7KBHg+DxYkNokHo1WJxA2yl0WzFegn2GM96E/r0RLRTCyhqbUoeclmHuhxotVZIU2Wgjy61iL5scgfQu6I8gOg2x6xOCWgkJir7fpq3H+EOCDu0SkZX06vocbzyppBAR0jA4lbgifpJIbl/qyBIEM16tpGtBdg4OYci6BP5YW4YAw==\",\n      \"page_age\": null\n    },\n    {\n      \"title\": \"What does \\u201cbest practice\\u201d mean in software development? - Quora\",\n      \"url\": \"https://www.quora.com/What-does-best-practice-mean-in-software-development\",\n      \"encrypted_content\": \"EsoDCioIBBgCIiRmY2JiZWJiNC0yNjUzLTQ1OGEtYjhkMC1mMjY5NzhjMGFhYjISDPAvV7h6nWKHlJ5wVhoM2EhmVI5Pltg34uhtIjDzYnKXPryus+cwiRbWDMl1FzeAytKpUtiEKHwazCNWggTKkBzHH3lcGxoxtvNcTOYqzQLx3CMJFNoDd6lkurfGwe8rPno7vudp/tqwYymYDpkNqXwRvDWbe/EQHf+tnNPxisbl0rp1VcODyC+mo7kE/V52CoVHDrM6lKC9WU4lm1trE0xxNY6uOK+li8nqmwTfBJWhG2R+BcPIDzuGTLK8BS8DSIW9jk2VQxfvOWXU+ymR+4Xnxi3J0IcZiqNQHxFDmkMon2mDmnNXHaV7XkY5RqeaeEZ65Ra67Zm/3QGoHsIEGYLH/jWi1qZOHdxWq/qlHM3geyOYetyZ+DaM0+lkTZrexNxz2aaALS3SwWTlCpXwDufuCHcYPLM/wyggLgUES/UFxlJNsrprhfxoxDFwTHFpwZ2wDVP8R2MhtBknsra+AELtd3WCsWBvxUDpTe+MtL6+tY1p+B6fky3+bXOujZzBKzq6o8xujnMhSOBxEOBqzqoZmOcrCrPp134vynUYAw==\",\n      \"page_age\": null\n    },\n    {\n      \"title\": \"Coding Standards and Best Practices to Follow | BrowserStack\",\n      \"url\": \"https://www.browserstack.com/guide/coding-standards-best-practices\",\n      \"encrypted_content\": \"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\",\n      \"page_age\": \"July 2, 2024\"\n    },\n    {\n      \"title\": \"10 Software Development Best Practices (2025 Checklist)\",\n      \"url\": \"https://www.2am.tech/blog/software-development-best-practices\",\n      \"encrypted_content\": \"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\",\n      \"page_age\": \"April 28, 2025\"\n    },\n    {\n      \"title\": \"What software development practices did you strongly believe in but later completely reject? - Quora\",\n      \"url\": \"https://www.quora.com/What-software-development-practices-did-you-strongly-believe-in-but-later-completely-reject\",\n      \"encrypted_content\": \"EroDCioIBBgCIiRmY2JiZWJiNC0yNjUzLTQ1OGEtYjhkMC1mMjY5NzhjMGFhYjISDFj/QbMlnAz0wyB8RBoMv3wE8i6WLveLFpR4IjBqn572QW5bIjFDipaekvJjVVqc1kOQpm5AFodj4HzPcB4eCSjRZPVMXbiOeKZPWSkqvQK48eicIxJ3czkPqExcCfZhPJCMFxEuTIeXMNpFqlAOW7yGyNo288hpidJ5j/4V7r5gMzSnXT+5gNi9OT7j9kxLPMM5r2ia3SUTNNLtb3Fx9OS7wpMyUzhupJL2V5/Z+dnHFkh47vZ+TYynnt+waDV+3UFOrb1osDjC4NTysXqrmy5URLLBPWc+tKDB7KN4ISOE2DTqg3d69TC3RCeezVp/l/YHFytcKAzmfNfehPIz4gI+wuB5/tZimbIog9xvABfyC00swy2uaKHtRUXwC9kqreIdb6LKE1kTYvrprZTQpLCetsMi4q5QQGevX5FA8iPCpGt39JTnrxZV/yUnQXcy28ER7bqTHOW9Dob+dJPe1PZGDj1WTM1y3YEt7VkmUShs62qgDcgbyh2Jy9DxcXcGbSqCP/JTNm+NZTawwhgD\",\n      \"page_age\": null\n    },\n    {\n      \"title\": \"Checklist for Software Development Best Practices\",\n      \"url\": \"https://devot.team/blog/software-development-best-practices\",\n      \"encrypted_content\": \"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\",\n      \"page_age\": \"May 10, 2024\"\n    }\n  ],\n  \"status\": \"success\",\n  \"server_executed\": true,\n  \"instructions\": \"Web search completed by Anthropic's server-side tool.\"\n}"
+                },
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_01CAJzyNVfZGYo26nNPPEC4s",
+                    "content": "\u251c\u2500\u2500 fastapi_app/\n\u2502   \u251c\u2500\u2500 .github/\n\u2502   \u2502   \u2514\u2500\u2500 workflows/\n\u2502   \u2502       \u2514\u2500\u2500 fly-deploy.yml (path: fastapi_app/.github/workflows/fly-deploy.yml)\n\u2502   \u251c\u2500\u2500 routes/\n\u2502   \u2502   \u251c\u2500\u2500 __init__.py (path: fastapi_app/routes/__init__.py)\n\u2502   \u2502   \u251c\u2500\u2500 emoji.py (path: fastapi_app/routes/emoji.py)\n\u2502   \u2502   \u251c\u2500\u2500 random.py (path: fastapi_app/routes/random.py)\n\u2502   \u2502   \u251c\u2500\u2500 recur_print.py (path: fastapi_app/routes/recur_print.py)\n\u2502   \u2502   \u251c\u2500\u2500 test.py (path: fastapi_app/routes/test.py)\n\u2502   \u2502   \u2514\u2500\u2500 time.py (path: fastapi_app/routes/time.py)\n\u2502   \u251c\u2500\u2500 .dockerignore (path: fastapi_app/.dockerignore)\n\u2502   \u251c\u2500\u2500 .gitignore (path: fastapi_app/.gitignore)\n\u2502   \u251c\u2500\u2500 Dockerfile (path: fastapi_app/Dockerfile)\n\u2502   \u251c\u2500\u2500 app.py (path: fastapi_app/app.py)\n\u2502   \u251c\u2500\u2500 cairn-dev.2025-04-22.private-key.pem (path: fastapi_app/cairn-dev.2025-04-22.private-key.pem)\n\u2502   \u251c\u2500\u2500 config.py (path: fastapi_app/config.py)\n\u2502   \u251c\u2500\u2500 poetry.lock (path: fastapi_app/poetry.lock)\n\u2502   \u251c\u2500\u2500 pyproject.toml (path: fastapi_app/pyproject.toml)\n\u2502   \u2514\u2500\u2500 requirements.txt (path: fastapi_app/requirements.txt)\n\u251c\u2500\u2500 .gitignore (path: .gitignore)\n\u251c\u2500\u2500 README.md (path: README.md)\n\u2514\u2500\u2500 test_python.py (path: test_python.py)"
+                }
+            ]
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Now let me list files in the root directory:"
+                },
+                {
+                    "type": "tool_use",
+                    "id": "toolu_0139163czfdhBwucbzhw6Ash",
+                    "name": "list_files",
+                    "input": {
+                        "path": ""
+                    }
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_0139163czfdhBwucbzhw6Ash",
+                    "content": "[{'name': '.gitignore', 'path': '.gitignore', 'type': 'file'}, {'name': 'README.md', 'path': 'README.md', 'type': 'file'}, {'name': 'fastapi_app', 'path': 'fastapi_app', 'type': 'dir'}, {'name': 'test_python.py', 'path': 'test_python.py', 'type': 'file'}]"
+                }
+            ]
+        }
+    ],
+    "tools": [
+        {
+            "name": "edit_file_descriptively",
+            "description": "\n            Apply edits to a file using natural language suggestions.\n\n            Your edits should be formatted to include code snippets in the following format to show exactly what the new code should look like while abstracting out unchanged code:\n            You can additionally include bullet points, comments, etc. But you should be INSANELY detailed and specific about what you want to change, such that someone can change the file without any other additional context.\n\n            Key guidelines for edit suggestions:\n            - Use \"// ... existing code ...\" (or equivalent comment syntax based on the language) to represent unchanged code\n            - Only include the specific code sections that need to be modified or added, and other bits of code as context for where to apply the change.\n            - You can include multiple code chunks in your suggestions, but make sure to include the context for where to apply the change.\n            - The tool will intelligently apply your changes while preserving the rest of the file.\n\n            Args:\n                file_path: The path to the file to edit, relative to the repository root\n                edit: A string showing new code, edited code, etc.\n\n            Returns:\n                dict: Success status, message, and details about the changes made\n\n            This tool is best used for large complex rewrites.\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "description": "The path to the file to edit, relative to the repository root.",
+                        "title": "File Path",
+                        "type": "string"
+                    },
+                    "edit": {
+                        "description": "Changes to make to the file, in the format of the actual code with comments explaining new blocks, and comments abstracting out unchanged code.",
+                        "title": "Edit",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "file_path",
+                    "edit"
+                ]
+            }
+        },
+        {
+            "name": "edit_files",
+            "description": "\n            Edit, create, or delete files in the GitHub repository by specifying an explicit unified diff.\n\n            This tool allows you to make changes to the codebase by specifying a target file and a modification to apply. You can:\n            - Create new files by specifying a path that doesn't exist yet\n            - Modify existing files by applying a unified diff (you can apply multiple diffs to the same file at once)\n            - Delete files by setting delete_file to true\n\n            You may use this tool in conjunction with the batch call tool to apply multiple diffs at the same time.\n\n            Args:\n                file_path (str) [REQUIRED]: The path to the file to edit or create, relative to the repository root\n                unified_diff (str) [REQUIRED]: A unified diff string describing the changes to apply to the file\n                              Each diff should follow the standard unified diff format with:\n                              - Hunk headers (@@ -<start_old>,<len_old> +<start_new>,<len_new> @@)\n                              - Lines prefixed with a space (context), - (deletion), or + (addition)\n                delete_file (bool) [OPTIONAL]: Set to true if you want to delete the entire file instead of editing it\n                create_file (bool) [OPTIONAL]: Set to true if you want to create a new blank file (you can also do this by setting unified_diff and file_path to a new file path).\n\n            This tool is best used for simple changes that don't require a lot of content.\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "description": "The path to the file to edit or create.",
+                        "title": "File Path",
+                        "type": "string"
+                    },
+                    "unified_diff": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "A unified diff string of changes to apply to the file. ",
+                        "title": "Unified Diff"
+                    },
+                    "create_file": {
+                        "default": false,
+                        "description": "if you want to create a new file with blank content, set this to true",
+                        "title": "Create File",
+                        "type": "boolean"
+                    },
+                    "delete_file": {
+                        "default": false,
+                        "description": "Whether to delete the file specified by `file_path`.",
+                        "title": "Delete File",
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "file_path"
+                ]
+            }
+        },
+        {
+            "name": "view_repository_structure",
+            "description": "View the directory structure of the repository.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "max_depth": {
+                        "default": "5",
+                        "description": "Maximum depth of directories to display",
+                        "title": "Max Depth",
+                        "type": "string"
+                    }
+                },
+                "required": []
+            }
+        },
+        {
+            "name": "list_files",
+            "description": "\n            List all files and directories in the GitHub repository at a specified path.\n\n            Args:\n                path: The directory path to list contents from, relative to the\n                      repository root. Defaults to \"\" (root directory).\n\n            Returns:\n                list[dict]: A list of dictionaries, each representing a file or directory with the following keys:\n                    - 'name': The name of the file or directory\n                    - 'path': The full path of the file or directory relative to the repo root\n                    - 'type': Either 'file' or 'dir' indicating the entry type\n\n            Examples:\n                >>> list_files({\"path\": \"\"})\n                [\n                    {'name': 'src', 'path': 'src', 'type': 'dir'}\n                ]\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "default": "",
+                        "description": "The directory path to list contents from, relative to the repository root",
+                        "title": "Path",
+                        "type": "string"
+                    }
+                },
+                "required": []
+            }
+        },
+        {
+            "name": "read_file",
+            "description": "\n            Read and return the contents of a specific file from the GitHub repository.\n\n            This tool allows direct access to the content of any file in the repository.\n            Use it to examine source code, configuration files, documentation, or any other\n            textual content in the codebase.\n\n            PREFERRED APPROACH: Use 'read_near_content_like' with a snippet of code or text you're looking for.\n            This uses fuzzy matching to find the most relevant section and returns ~100 lines around it.\n            This is much more useful than guessing line numbers when you have an idea of what the code looks like.\n\n            Args:\n                file_request: Parameters specifying the file to read and search options.\n                    - path: The file path inside the repository, relative to the root.\n                            For example: 'src/utils.py', 'config/settings.json', 'README.md'.\n                    - read_near_content_like: [RECOMMENDED] A code snippet or text to search for using fuzzy matching.\n                            The tool will find the best match and return ~100 lines around it.\n                            Example: \"def process_data\" or \"class UserModel\" or \"import pandas\"\n                    - line_start: First line to read (1-indexed, optional) - use only if you know exact line numbers\n                    - line_end: Last line to read (1-indexed, optional) - use only if you know exact line numbers\n\n            Returns:\n                str: The requested contents of the file. If fuzzy matching is used, includes metadata\n                     about the match quality and line numbers. If line range is specified, only those lines.\n\n            Examples:\n                >>> read_file({\"path\": \"src/main.py\", \"read_near_content_like\": \"def main\"})\n                Returns the main function and ~100 lines around it with match metadata\n\n                >>> read_file({\"path\": \"README.md\"})\n                \"# My Project\nThis is the project documentation...\"\n\n                >>> read_file({\"path\": \"src/main.py\", \"line_start\": 5, \"line_end\": 10})\n                \"5: def main():\n6:     print('Hello world')\n7: \n8: if __name__ == '__main__':\n9:     main()\"\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "description": "The file path inside the repository, relative to the root",
+                        "title": "Path",
+                        "type": "string"
+                    },
+                    "line_start": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "First line to read (1-indexed), optional",
+                        "title": "Line Start"
+                    },
+                    "line_end": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "Last line to read (1-indexed), optional",
+                        "title": "Line End"
+                    },
+                    "read_near_content_like": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "Use fuzzy matching to find content similar to this string and return ~100 lines around the best match. This is often more useful than line numbers when you don't know the exact location but have an idea of what the code looks like.",
+                        "title": "Read Near Content Like"
+                    }
+                },
+                "required": [
+                    "path"
+                ]
+            }
+        },
+        {
+            "name": "generate_output",
+            "description": "\n            Generate a structured output for the Software Engineer agent.\n\n            This tool is used to format the final response of the SWE agent according to the\n            expected schema with implementation details, files modified, and verification status.\n\n            Args:\n                input_data: A SWEResponse object containing:\n                    - summary_of_changes: Summary of the changes made\n                    - files_modified: List of files that were modified\n                    - verification_status: Whether the changes were successfully verified\n                    - error_messages: List of error messages encountered, if any\n                    - additional_notes: Any additional notes about the implementation\n\n            Returns:\n                SWEResponse: A structured response conforming to the SWEResponse schema.\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "summary_of_changes": {
+                        "description": "Summary of the changes made",
+                        "title": "Summary Of Changes",
+                        "type": "string"
+                    },
+                    "files_modified": {
+                        "description": "List of files that were modified",
+                        "items": {
+                            "type": "string"
+                        },
+                        "title": "Files Modified",
+                        "type": "array"
+                    },
+                    "verification_status": {
+                        "description": "Whether the changes were successfully verified",
+                        "title": "Verification Status",
+                        "type": "string"
+                    },
+                    "error_messages": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "List of error messages encountered, if any",
+                        "title": "Error Messages"
+                    },
+                    "additional_notes": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "Any additional notes about the implementation",
+                        "title": "Additional Notes"
+                    }
+                },
+                "required": [
+                    "summary_of_changes",
+                    "files_modified",
+                    "verification_status"
+                ]
+            }
+        },
+        {
+            "name": "spy_on_agent",
+            "description": "\n            This tool allows you to see the logs of an agent who may be working on a different subtask for the same overall task.\n\n            This is useful if you want to see what the agent is doing. For example, if you are a making a frontend change that relies on a backend change,\n            you might want to see what the agent implementing the backend change is doing.\n\n            If other agents were not specified upon starting a run, calling this will show you new agents that have been created if no input is specified.\n            I.e. just call with a dict with no arguments, i.e. {{}}.\n\n            Your response may depend on the status of the other agent. If the other agent has not started yet, then you won't receive any logs, and should make the decisions yourself\n            with the assumption that the other agent will view *your* logs and match its format accordingly.\n\n            Input format:\n            {\n                \"agent_id\": \"UUID of the agent/subtask to spy on\",\n                \"page\": 1,  # (Optional) Page number for log pagination, starting from 1\n                \"page_size\": 10  # (Optional) Number of logs per page, default 10\n            }\n\n            The response will include pagination information:\n            - total_logs: Total number of logs available\n            - current_page: Current page number\n            - total_pages: Total number of pages available\n            - has_next: True if there are more pages after this one\n            - has_prev: True if there are previous pages\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "run_id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "UUID of the agent/subtask to spy on",
+                        "title": "Run Id"
+                    },
+                    "page": {
+                        "default": 1,
+                        "description": "Page number for log pagination, starting from 1. Most recent logs are shown first (page 1).",
+                        "title": "Page",
+                        "type": "integer"
+                    },
+                    "page_size": {
+                        "default": 3,
+                        "description": "Number of logs per page",
+                        "title": "Page Size",
+                        "type": "integer"
+                    }
+                },
+                "required": []
+            }
+        },
+        {
+            "name": "search_files_by_name",
+            "description": "\n            Search for files in the repository by filename using fuzzy matching.\n\n            This tool is useful when you know part of a filename but don't know the exact path.\n            It uses fuzzy string matching to find files with similar names and returns them\n            sorted by relevance score.\n\n            Args:\n                query: The filename or partial filename to search for\n                threshold: Fuzzy matching threshold (0-100), higher values require closer matches (default: 60)\n                max_results: Maximum number of results to return (default: 20)\n\n            Returns:\n                list[dict]: A list of matching files with the following structure:\n                    - path: Full path to the file in the repository\n                    - filename: Just the filename (last part of the path)\n                    - score: Fuzzy matching score (0-100, higher is better match)\n\n            Examples:\n                >>> search_files_by_name({\"query\": \"utils\"})\n                [\n                    {\"path\": \"src/utils.py\", \"filename\": \"utils.py\", \"score\": 85},\n                    {\"path\": \"tests/test_utils.py\", \"filename\": \"test_utils.py\", \"score\": 75}\n                ]\n\n                >>> search_files_by_name({\"query\": \"config\", \"threshold\": 80, \"max_results\": 5})\n                [\n                    {\"path\": \"config/settings.py\", \"filename\": \"settings.py\", \"score\": 82}\n                ]\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "description": "The filename or partial filename to search for",
+                        "title": "Query",
+                        "type": "string"
+                    },
+                    "threshold": {
+                        "default": 60,
+                        "description": "Fuzzy matching threshold (0-100), higher values require closer matches",
+                        "title": "Threshold",
+                        "type": "integer"
+                    },
+                    "max_results": {
+                        "default": 5,
+                        "description": "Maximum number of results to return",
+                        "title": "Max Results",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "query"
+                ]
+            }
+        },
+        {
+            "name": "substring_search",
+            "description": "\n            Search for exact substring matches in code content across the repository.\n\n            \u26a0\ufe0f  IMPORTANT: This tool only finds EXACT substring matches in code. For more effective repository exploration, consider these alternatives:\n            \u2022 Use \"embedding_search\" for finding semantically relevant files based on natural language queries\n            \u2022 Use \"view_repository_structure\" to understand the overall codebase organization\n            \u2022 Use \"search_files_by_name\" to find files by filename patterns\n\n            This substring search is best for:\n            \u2022 Finding where a specific function, variable, or class name is used\n            \u2022 Locating exact code snippets or error messages\n            \u2022 Tracking down specific string literals or constants\n\n            Args:\n                query: The exact substring, function name, variable name, or text to search for\n                path: Optional subdirectory path to limit search (e.g. 'src/utils')\n                page: Page number for pagination, starting from 1 (default: 1)\n                page_size: Number of matched files to return per page (default: 10)\n\n            Returns:\n                Dictionary containing:\n                - results: List of files containing the exact search term with file paths and text matches\n                - pagination: Information about current page, total pages, etc.\n\n            If you receive too many results, you can paginate or make your query more specific.\n            If you receive no matches and you were expecting to find some, the codebase may not be indexed yet.\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "description": "The code snippet, function name, variable name, or text to search for in the repository",
+                        "title": "Query",
+                        "type": "string"
+                    },
+                    "path": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "Optional subdirectory path to limit search (e.g. 'src/utils'). If not specified, searches entire repository.",
+                        "title": "Path"
+                    },
+                    "page": {
+                        "default": 1,
+                        "description": "Page number for pagination, starting from 1",
+                        "title": "Page",
+                        "type": "integer"
+                    },
+                    "page_size": {
+                        "default": 10,
+                        "description": "Number of matched files to return per page",
+                        "title": "Page Size",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "query"
+                ]
+            }
+        },
+        {
+            "name": "batch_tool",
+            "description": "\n            Invoke multiple other tool calls simultaneously.\n\n            If you have multiple tools that you want to call, you should use this tool to call them all at once (more efficient).\n            ",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "tool_calls": {
+                        "description": "List of tool calls to make",
+                        "items": {
+                            "properties": {
+                                "name": {
+                                    "description": "Name of the tool to call",
+                                    "type": "string"
+                                },
+                                "args": {
+                                    "description": "Arguments to pass to the tool",
+                                    "type": "object"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "args"
+                            ],
+                            "type": "object"
+                        },
+                        "title": "Tool Calls",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "tool_calls"
+                ]
+            }
+        }
+    ],
+    "server_tools": {
+        "web_search": {
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": 5,
+            "description": "Search the internet for information and extract relevant content in a single step. Provides comprehensive search results with automatic citations and extracted content from relevant websites.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query in natural language"
+                    }
+                },
+                "required": [
+                    "query"
+                ]
+            }
+        }
+    },
+    "tool_choice": {
+        "type": "auto"
+    },
+    "kwargs": {}
+}

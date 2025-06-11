@@ -1007,7 +1007,6 @@
                     throw new Error(err.detail || 'Failed to start agent');
                 }
                 const result = await response.json();
-                showAlert(`Agent started with Run ID: ${result.run_id}`);
                 resetForm();
                 fetchActiveTasks(); // immediate refresh
             } catch (error) {

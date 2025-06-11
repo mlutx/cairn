@@ -138,7 +138,7 @@ class SoftwareEngineerAgent:
                 run_id=self.run_id,
             )
 
-        self.llm_client = llm_client or ChatAnthropic(model=model_name)
+        self.llm_client = llm_client or ChatAnthropic(model=model_name, raw_logging=True)
 
     async def _setup_graph(self, repos, branch):
         """Create and configure the agent graph."""
@@ -244,10 +244,10 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
     branch = f"swe-agent-test-{timestamp}"
 
     # Create a unique run ID
-    run_id = f"testrun123"
+    run_id = branch
 
     # Demonstration of a task
-    task_description = "please try searching the internet for stripe documentation, then call generate output with info that describes the documentation you found."
+    task_description = "please try to search the tool to search a single stripe doc link then in the same LLM response use that data to call the edit file tool with the path 'example.md' and the content 'here is strip doc info' ad the info. do this in a single turn."
 
     # Create and setup the agent
     agent = SoftwareEngineerAgent()

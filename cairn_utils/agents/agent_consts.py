@@ -6,6 +6,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
+from llm_consts import ToolCall, ToolResult
 
 
 # Define the state schema using Pydantic
@@ -17,7 +18,7 @@ class AgentState(BaseModel):
         default_factory=list,
         description="Conversation messages in proper user/assistant format",
     )
-    tool_calls: List[Dict[str, Any]] = Field(
+    tool_calls: List[ToolCall] = Field(
         default_factory=list, description="List of tool calls to execute in sequence"
     )
     most_recent_thought: str = Field(
@@ -26,7 +27,7 @@ class AgentState(BaseModel):
     tool_outputs: List[Dict[str, Any]] = Field(
         default_factory=list, description="List of all tool outputs with their metadata"
     )
-    server_tool_results: Dict[str, Dict[str, Any]] = Field(
+    server_tool_results: Dict[str, ToolResult] = Field(
         default_factory=dict, description="Results from server-side tool executions (like web_search)"
     )
 
