@@ -146,6 +146,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+cairn-env/
 
 node_modules/
 # Spyder project settings
