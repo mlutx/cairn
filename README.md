@@ -338,12 +338,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - and more...
 
 
-<!--
+
 <div align="center">
 
 [![Star History Chart](https://api.star-history.com/svg?repos=cairn-dev/cairn&type=Date)](https://www.star-history.com/#cairn-dev/cairn&Date)
 
-</div> -->
+</div>
 
 ---
 
