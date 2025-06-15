@@ -111,6 +111,17 @@ class DefaultToolBox:
         self.repo_memory = {}
         self._load_cairn_repo_memory()
 
+    def _get_cairn_dir(self) -> str:
+        """
+        Get the path to the .cairn directory, which should be one level up from where toolbox.py is located.
+        """
+        # Get the directory where toolbox.py is located
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Go one directory up to get to the parent directory
+        parent_dir = os.path.dirname(current_dir)
+        # Return the path to .cairn in the parent directory
+        return os.path.join(parent_dir, ".cairn")
+
     async def authenticate(self):
         self.jwt_token = generate_jwt()
         self.installation_token = await get_installation_token(
@@ -1099,8 +1110,8 @@ class DefaultToolBox:
             self.settings = None
             return
 
-        # Use current working directory
-        cairn_dir = ".cairn"
+        # Use the correct .cairn directory path
+        cairn_dir = self._get_cairn_dir()
         settings_file = os.path.join(cairn_dir, "settings.json")
 
         print(f"settings file: {settings_file}")
@@ -1157,7 +1168,8 @@ class DefaultToolBox:
         self.repo_memory[self.repo] = repo_memory
 
         # write the updated repo memory to the file
-        with open(os.path.join(".cairn", "memory", f"{self.repo}.json"), "w") as f:
+        memory_file = os.path.join(self._get_cairn_dir(), "memory", f"{self.repo}.json")
+        with open(memory_file, "w") as f:
             json.dump({"memory": repo_memory}, f, indent=4)
 
         print(f"[DEBUG] updated repo memory for {self.repo} to: {repo_memory}")
@@ -1193,7 +1205,7 @@ class DefaultToolBox:
             return
 
         # check if directory exists, and if not, creates it
-        cairn_dir = ".cairn"
+        cairn_dir = self._get_cairn_dir()
         memory_dir = os.path.join(cairn_dir, "memory")
         if not os.path.exists(memory_dir):
             os.makedirs(memory_dir)
