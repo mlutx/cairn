@@ -426,92 +426,52 @@ async def _execute_single_tool(tool_call: ToolCall, tools_dict: Dict[str, Any], 
         state: Current agent state
 
     Returns:
-        tuple: (tool_output, is_error)
+        tuple[Any, bool]: (tool_output, is_error) where tool_output is the result and is_error indicates if an error occurred
     """
-    tool_id, tool_name, tool_input = tool_call.id, tool_call.name, tool_call.input
-
-    # Check if this tool was executed server-side
     if tool_call.server_executed:
-        # Handle server-executed tools (like web_search)
-        server_tool_results = state.server_tool_results
-        print(f"\n[DEBUG] Looking for server tool results for ID: {tool_id}")
-        print(f"[DEBUG] Available server tool result IDs: {list(server_tool_results.keys())}")
+        return await _handle_server_tool(tool_call, state)
+    return await _handle_client_tool(tool_call, tools_dict)
 
-        if tool_id in server_tool_results:
-            # Extract and format the server-side results
-            search_result = server_tool_results[tool_id]
 
-            # Handle web_search tool specifically with more structured output
-            if tool_name == "web_search":
-                search_content = search_result.content
+async def _handle_server_tool(tool_call: ToolCall, state: AgentState) -> tuple[Any, bool]:
+    """Handle execution of server-side tools like web_search."""
+    tool_id, tool_name = tool_call.id, tool_call.name
+    server_tool_results = state.server_tool_results
 
-                # Format the results for the tool output
-                formatted_results = []
-                if isinstance(search_content, list):
-                    for item in search_content:
-                        if isinstance(item, dict) and item.get("type") == "web_search_result":
-                            formatted_results.append({
-                                "title": item.get("title", ""),
-                                "url": item.get("url", ""),
-                                "encrypted_content": item.get("encrypted_content", ""),
-                                "page_age": item.get("page_age", "")
-                            })
+    if tool_id not in server_tool_results:
+        error_msg = f"Server-executed tool {tool_name} (ID: {tool_id}) results not found. Available IDs: {list(server_tool_results.keys())}"
+        return error_msg, True
 
-                tool_output = {
-                    "query": tool_input.get("query", ""),
-                    "results": formatted_results,
-                    "status": "success",
-                    "server_executed": True,
-                    "instructions": "Web search completed by the server-side tool."
-                }
-            else:
-                # Generic handling for other server-side tools
-                tool_output = {
-                    "result": search_result.content,
-                    "status": "success",
-                    "server_executed": True,
-                    "instructions": f"Tool {tool_name} executed by the server."
-                }
+    search_result = server_tool_results[tool_id]
+    tool_output = {
+        "result": search_result.content,
+        "status": "success",
+        "server_executed": True,
+        "instructions": f"Tool {tool_name} executed by the server."
+    }
 
-            return tool_output, False
-        else:
-            # Check if we can find the result with any available ID
-            available_ids = list(server_tool_results.keys())
-            error_message = f"Server-executed tool {tool_name} (ID: {tool_id}) results not found. Available IDs: {available_ids}. This suggests the server may have only executed some of the tools in the batch."
-            print(f"\n[DEBUG] {error_message}")
+    return tool_output, False
 
-            # For web search, provide a fallback response indicating the search wasn't executed
-            if tool_name == "web_search":
-                tool_output = {
-                    "query": tool_input.get("query", ""),
-                    "results": [],
-                    "status": "not_executed",
-                    "server_executed": False,
-                    "instructions": "This web search was not executed by the server. This can happen when multiple web searches are requested simultaneously."
-                }
-                return tool_output, False
-            else:
-                return error_message, True
-    else:
-        # Check if tool exists for client-side execution
-        tool_definition = tools_dict.get(tool_name)
-        if not tool_definition:
-            error_message = f"Tool {tool_name} not found"
-            return error_message, True
-        else:
-            # Execute the tool client-side
-            try:
-                tool_function = tool_definition.get("function")
-                tool_output = await tool_function(tool_input)
 
-                # Handle None output
-                if tool_output is None:
-                    tool_output = {"result": "No output returned from tool"}
-                return tool_output, False
+async def _handle_client_tool(tool_call: ToolCall, tools_dict: Dict[str, Any]) -> tuple[Any, bool]:
+    """Handle execution of client-side tools."""
+    tool_name = tool_call.name
+    tool_definition = tools_dict.get(tool_name)
 
-            except Exception as e:
-                error_message = f"Error executing tool {tool_name}: {str(e)}"
-                return error_message, True
+    if not tool_definition:
+        return f"Tool {tool_name} not found", True
+
+    try:
+        tool_function = tool_definition.get("function")
+        tool_output = await tool_function(tool_call.input)
+
+        if tool_output is None:
+            return {"result": "No output returned from tool"}, False
+
+        return tool_output, False
+
+    except Exception as e:
+        return f"Error executing tool {tool_name}: {str(e)}", True
 
 
 def _check_for_task_completion(messages: List[Dict]) -> bool:
