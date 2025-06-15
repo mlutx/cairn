@@ -1788,11 +1788,7 @@
                 }
 
                 const result = await response.json();
-                if (childTasks.length > 0) {
-                    showAlert(`Task ${taskId} and ${childTasks.length} related subtask${childTasks.length > 1 ? 's' : ''} deleted successfully`);
-                } else {
-                    showAlert(result.message || `Task ${taskId} deleted successfully`);
-                }
+
                 fetchActiveTasks(); // Refresh to show updated tasks
 
             } catch (error) {

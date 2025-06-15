@@ -41,7 +41,7 @@ class DatabaseLogHandler(logging.Handler):
     def emit(self, record):
         if self._is_handling:  # Skip if we're already handling a log
             return
-            
+
         try:
             self._is_handling = True
             conn = sqlite3.connect(DB_PATH, timeout=30)
@@ -151,7 +151,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 5000")
-    
+
     # Initialize database schema if needed
     try:
         # Check if active_tasks table exists
@@ -168,7 +168,7 @@ def get_db_connection():
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-        
+
         # Check if task_logs table exists
         cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_logs'")
         if not cursor.fetchone():
@@ -183,7 +183,7 @@ def get_db_connection():
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-        
+
         # Check if debug_messages table exists
         cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_messages'")
         if not cursor.fetchone():
@@ -195,63 +195,63 @@ def get_db_connection():
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-        
+
         # Add any missing columns to active_tasks
         cursor = conn.execute("PRAGMA table_info(active_tasks)")
         existing_columns = {row['name'] for row in cursor.fetchall()}
-        
+
         # Add run_id column if it doesn't exist
         if 'run_id' not in existing_columns:
             logger.info("Adding run_id column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN run_id TEXT")
-        
+
         # Add run_ids column if it doesn't exist
         if 'run_ids' not in existing_columns:
             logger.info("Adding run_ids column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN run_ids TEXT")
-        
+
         # Add agent_type column if it doesn't exist
         if 'agent_type' not in existing_columns:
             logger.info("Adding agent_type column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN agent_type TEXT")
-        
+
         # Add agent_status column if it doesn't exist
         if 'agent_status' not in existing_columns:
             logger.info("Adding agent_status column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN agent_status TEXT")
-        
+
         # Add agent_output column if it doesn't exist
         if 'agent_output' not in existing_columns:
             logger.info("Adding agent_output column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN agent_output TEXT")
-        
+
         # Add related_run_ids column if it doesn't exist
         if 'related_run_ids' not in existing_columns:
             logger.info("Adding related_run_ids column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN related_run_ids TEXT")
-        
+
         # Add sibling_subtask_ids column if it doesn't exist
         if 'sibling_subtask_ids' not in existing_columns:
             logger.info("Adding sibling_subtask_ids column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN sibling_subtask_ids TEXT")
-        
+
         # Add parent_fullstack_id column if it doesn't exist
         if 'parent_fullstack_id' not in existing_columns:
             logger.info("Adding parent_fullstack_id column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN parent_fullstack_id TEXT")
-        
+
         # Add subtask_index column if it doesn't exist
         if 'subtask_index' not in existing_columns:
             logger.info("Adding subtask_index column to active_tasks")
             conn.execute("ALTER TABLE active_tasks ADD COLUMN subtask_index INTEGER")
-        
+
         conn.commit()
         logger.info("Database schema initialization completed")
     except Exception as e:
         logger.error(f"Error initializing database schema: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise
-    
+
     return conn
 
 def get_configuration():
@@ -615,7 +615,7 @@ async def create_subtasks_from_fullstack_planner(request: CreateSubtasksRequest)
             if request.subtask_index < 0 or request.subtask_index >= len(subtasks):
                 logger.error(f"Invalid subtask index: {request.subtask_index}, total subtasks: {len(subtasks)}")
                 raise HTTPException(status_code=400, detail=f"Invalid subtask index: {request.subtask_index}")
-            
+
             # Check if this subtask has already been run
             subtask_id = subtask_id_map.get(request.subtask_index)
             if subtask_id and subtask_id in existing_tasks:
@@ -636,7 +636,7 @@ async def create_subtasks_from_fullstack_planner(request: CreateSubtasksRequest)
                 subtask_id = subtask_id_map.get(i)
                 if not subtask_id or subtask_id not in existing_tasks or existing_tasks[subtask_id] not in ['Completed', 'Running', 'Queued']:
                     subtask_indices.append(i)
-            
+
             if not subtask_indices:
                 logger.info("All subtasks have already been run")
                 return CreateSubtasksResponse(
@@ -864,8 +864,6 @@ async def delete_active_task(task_id: str):
         if task_id in worker_manager.active_tasks:
             del worker_manager.active_tasks[task_id]
             logger.info(f"Removed task {task_id} from WorkerManager active_tasks")
-
-        return {"message": f"Task {task_id} deleted successfully"}
 
     except HTTPException:
         raise
