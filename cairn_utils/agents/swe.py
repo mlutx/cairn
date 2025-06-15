@@ -140,7 +140,7 @@ class SoftwareEngineerAgent:
                 run_id=self.run_id,
             )
 
-        self.llm_client = llm_client or ChatAnthropic(model=model_name, raw_logging=True)
+        self.llm_client = llm_client or ChatAnthropic(model=model_name)
 
         # Load fake responses if path is provided
         if fake_calls_path and os.path.exists(fake_calls_path):
@@ -280,6 +280,7 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
         #     "description": "add a function to the backend that fetches a string of random emojis",
         #     "repo": "cairn-dev/backend"
         # }]
+        fake_calls_path="testing/fake_anthropic_calls.json"
     )
 
     # Run the agent and write final state to JSON

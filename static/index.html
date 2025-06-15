@@ -260,6 +260,80 @@
             display: block;
         }
 
+        .log-toggle {
+            background: #1f2937;
+            color: #94a3b8;
+            border: 1px solid #374151;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .log-toggle:hover {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-color: #4b5563;
+        }
+
+        .payload-toggle {
+            background: #1f2937;
+            color: #94a3b8;
+            border: 1px solid #374151;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .payload-toggle:hover {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-color: #4b5563;
+        }
+
+        .payload-toggle.active {
+            background: #1e40af;
+            color: #e2e8f0;
+            border-color: #3b82f6;
+        }
+
+        .payload-toggle .arrow {
+            display: inline-block;
+            transition: transform 0.2s ease;
+            opacity: 0.7;
+        }
+
+        .payload-toggle.active .arrow {
+            transform: rotate(180deg);
+            opacity: 1;
+        }
+
+        .payload-content {
+            display: none;
+            margin-top: 15px;
+            padding: 12px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+        }
+
+        .payload-content.visible {
+            display: block;
+        }
+
         .nested-tasks {
             margin-top: 15px;
             padding-left: 20px;
@@ -1119,12 +1193,14 @@
                                payload.agent_output.list_of_subtasks.length > 0;
 
             // Create buttons HTML
-            let buttonsHtml = `<button class="secondary" onclick="viewLogs('${taskId}', '${displayId}')">View Logs</button>`;
+            let buttonsHtml = '';
 
             // For child tasks, also show parent task ID in the logs button
             if (parent_run_id || parent_fullstack_id) {
                 const parentId = parent_run_id || parent_fullstack_id;
-                buttonsHtml = `<button class="secondary" onclick="viewLogs('${taskId}', '${displayId} (Child of ${parentId})')">View Logs</button>`;
+                buttonsHtml = `<button class="log-toggle" onclick="event.stopPropagation(); viewLogs('${taskId}', '${displayId} (Child of ${parentId})')">Logs</button>`;
+            } else {
+                buttonsHtml = `<button class="log-toggle" onclick="event.stopPropagation(); viewLogs('${taskId}', '${displayId}')">Logs</button>`;
             }
 
             if (hasSubtasks) {
@@ -1142,7 +1218,6 @@
                 ).length;
 
                 if (allSubtasksRun) {
-                    buttonsHtml += `<button disabled class="all-subtasks-run">All PM Tasks Run</button>`;
                 } else if (runSubtasks > 0) {
                     buttonsHtml += `<button onclick="createSubtasks('${taskId}')">🚀 Create Remaining PM Tasks (${runSubtasks}/${childTasks.length} run)</button>`;
                 } else {
@@ -1338,7 +1413,7 @@
 
             return `
                 <div class="task ${taskClass}" data-task-id="${task.task_id}">
-                    <div class="task-header" onclick="toggleTask(this)">
+                    <div class="task-header" onclick="handleTaskHeaderClick(this, event)">
                         <div class="task-header-content">
                             <strong>${taskId}</strong> ${hasChildren ? `<span class="has-children-indicator">${childTasks.length} subtask${childTasks.length > 1 ? 's' : ''}</span>` : ''} (${agent_type || 'Unknown'})
                             <p style="font-size: 12px; color: #6b7280;">${truncatedDesc}</p>
@@ -1346,19 +1421,25 @@
                             ${prLinksHtml}
                             ${subtaskStatus}
                         </div>
-                        <div style="display: flex; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;" onclick="event.stopPropagation();">
+                            ${buttonsHtml}
+                            <button class="payload-toggle" onclick="togglePayload('${task.task_id}')">
+                                Payload <span class="arrow">▼</span>
+                            </button>
                             <span class="status-badge ${statusClass}">${agent_status || 'UNKNOWN'}</span>
-                            <button class="delete-task-btn" onclick="event.stopPropagation(); deleteTask('${taskId}', ${hasChildren})">
+                            <button class="delete-task-btn" onclick="deleteTask('${taskId}', ${hasChildren})">
                                 <span style="margin-right: 3px;">🗑️</span> Delete
                             </button>
                         </div>
                     </div>
                     <div class="task-content">
                         ${showFullDescription ? `<div style="margin-top: 10px;"><p style="font-size: 12px; color: #6b7280;">${fullDesc}</p></div>` : ''}
+                        <div class="payload-content" id="payload-${task.task_id}">
+                            <div id="json-viewer-${task.task_id}"></div>
+                        </div>
                         ${subtaskCardsHtml}
                         <div class="button-row" style="margin-top: 15px;">
-                            ${buttonsHtml}
-                            ${runAllSubtasksButton}
+                            ${hasSubtasks ? buttonsHtml : ''}
                         </div>
                         ${childTasksHtml}
                     </div>
@@ -1512,7 +1593,12 @@
             logContainer.scrollTop = scrollPosition;
         }
 
-        window.toggleTask = (element) => {
+        window.handleTaskHeaderClick = (element, event) => {
+            // Don't toggle if we clicked a button
+            if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+                return;
+            }
+
             const taskElement = element.closest('.task');
             const taskId = taskElement.getAttribute('data-task-id');
             const content = element.nextElementSibling;
@@ -1524,17 +1610,31 @@
                 content.classList.add('expanded');
                 expandedTasks.add(taskId);
             }
+        };
 
-            // Show/hide the Run All button when expanding/collapsing
-            const runAllButton = content.querySelector('.run-all-subtasks');
-            if (runAllButton) {
-                if (content.classList.contains('expanded')) {
-                    runAllButton.style.display = 'inline-block';
-                } else {
-                    runAllButton.style.display = 'none';
+        window.togglePayload = (taskId) => {
+            const button = event.currentTarget;
+            event.stopPropagation();
+
+            // Toggle the active state of the button
+            button.classList.toggle('active');
+
+            // Find the payload content container
+            const payloadContent = document.getElementById(`payload-${taskId}`);
+            if (payloadContent) {
+                payloadContent.classList.toggle('visible');
+
+                // If the task content isn't expanded, expand it
+                const taskContent = payloadContent.closest('.task-content');
+                if (taskContent && !taskContent.classList.contains('expanded')) {
+                    taskContent.classList.add('expanded');
+                    const task = taskContent.closest('.task');
+                    if (task) {
+                        expandedTasks.add(task.getAttribute('data-task-id'));
+                    }
                 }
             }
-        }
+        };
 
         window.viewLogs = (runId, displayId) => {
             console.log('Opening log modal for runId:', runId, 'displayId:', displayId);
