@@ -71,8 +71,8 @@ def generate_jwt():
 
     payload = {
         "iat": int(time.time()) - 60,
-        "exp": int(time.time()) + (10 * 60),
-        "iss": APP_ID,
+        "exp": int(time.time()) + (10 * 5),
+        "iss": int(APP_ID),
     }
 
     return jwt.encode(payload, private_key, algorithm="RS256")

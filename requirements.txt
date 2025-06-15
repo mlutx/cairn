@@ -17,4 +17,4 @@ google-genai
 redis
 fastapi
 uvicorn[standard]
-curses
+windows-curses ; sys_platform == 'win32'
