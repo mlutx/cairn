@@ -2,6 +2,10 @@
 Defines wrappers around Anthropic API to add tool calling and other features.
 
 Currently only supports Anthropic models.
+
+NOTE: This module is being deprecated in favor of the LangChain-based implementation
+in cairn_utils/agents/langchain_llm.py. See MIGRATION_GUIDE.md for instructions
+on how to migrate.
 """
 
 import aiohttp
@@ -22,7 +26,7 @@ class ToolCall(BaseModel):
     id: str = Field(..., description="Unique identifier for the tool call")
     name: str = Field(..., description="Name of the tool to call")
     input: Dict[str, Any] = Field(..., description="Input parameters for the tool. Fed directly to the tool in toolbox.py or agent_classes.py")
-    type: Optional[str] = Field(None, description="Type of the tool call (e.g., 'function')")
+    type: Optional[str] = Field(None, description="Type of the tool call. Use 'tool_use' for client-side tool calls and 'server_tool_use' for server-side tool calls.")
     server_executed: Optional[bool] = Field(None, description="Whether the tool was executed server-side")
 
 
@@ -169,6 +173,16 @@ class AnthropicResponse(LLMResponse):
                     if block.get("type") == "text":
                         # Extract text content
                         text_parts.append(block.get("text", ""))
+                    elif block.get("type") == "tool_use":
+                        # Create ToolCall Pydantic model
+                        tool_call = ToolCall(
+                            id=block.get("id", ""),
+                            name=block.get("name", ""),
+                            input=block.get("input", {}),
+                            type="tool_use",
+                            server_executed=False
+                        )
+                        self.tool_calls.append(tool_call)
                     elif block.get("type") == "server_tool_use":
                         # Create ToolCall Pydantic model
                         tool_call = ToolCall(
@@ -180,18 +194,36 @@ class AnthropicResponse(LLMResponse):
                         )
                         self.tool_calls.append(tool_call)
                     elif block.get("type") == "web_search_tool_result":
-                        tool_use_id = block.get("tool_use_id")
-                        if tool_use_id:
-                            # Create ToolResult Pydantic model
-                            tool_result = ToolResult(
-                                content=block.get("content", []),
-                                type="web_search_tool_result",
-                                id=tool_use_id
-                            )
-                            self.tool_results[tool_use_id] = tool_result
+                        # Create ToolResult Pydantic model
+                        type =block.get("type", "")
+                        id = block.get("tool_use_id", "")
+                        content_processed = []
+                        if type == "web_search_tool_result":
+                            content = block.get("content", {})
+                            for content_block in content:
+                                content_processed.append({
+                                    "type": content_block.get("type", ""),
+                                    "title": content_block.get("title", ""),
+                                    "url": content_block.get("url", ""),
+                                })
+
+                        tool_result = ToolResult(
+                            content=content_processed,
+                            type=type,
+                            id=id
+                        )
+                        self.tool_results[block.get("id", "")] = tool_result
+
+                    # Not supporting other content blcoks (i.e. citations, etc.)
+                    else:
+                        continue
 
             # Set the concatenated text content
             self.text_content = "".join(text_parts)
+
+        print(f"\n[DEBUG] Text content: {self.text_content}")
+        print(f"\n[DEBUG] Tool calls: {self.tool_calls}")
+        print(f"\n[DEBUG] Tool results: {self.tool_results}")
 
 
 
@@ -207,8 +239,45 @@ class ChatLLM:
     1. System message with plain text content
     2. User messages with either plain text or tool_result content blocks
     3. Assistant messages with text content and optional tool_use blocks
+
+    Testing Support:
+    ---------------
+    This class includes support for "fake responses" to facilitate testing without making actual API calls.
+    This is useful for:
+    - Unit testing without API costs
+    - Simulating specific response scenarios
+    - Recording and replaying real API responses
+    - Development without hitting API rate limits
+
+    When using fake responses, the class will raise an error if they run out rather than
+    falling back to real API calls. This helps catch cases where more API calls are being
+    made than expected.
+
+    Example usage:
+    ```python
+    # Add a fake response
+    ChatLLM.add_fake_response({
+        "content": [
+            {"type": "text", "text": "This is a fake response"},
+            {"type": "tool_use", "id": "123", "name": "some_tool", "input": {}}
+        ]
+    })
+
+    # The next API call will return this fake response
+    response = await llm_client.ainvoke(messages)
+
+    # A second API call will raise an error since we're out of fake responses
+    await llm_client.ainvoke(messages)  # raises NoRemainingFakeResponsesError
+
+    # Clear fake responses when done
+    ChatLLM.clear_fake_responses()
+    ```
     """
 
+    # Class variable to store fake responses
+    _fake_responses = []
+    # Flag to indicate if fake responses were ever added
+    _using_fake_responses = False
 
     def __init__(self, model: str, api_key: Optional[str] = None, raw_logging: bool = False):
         """Initialize a chat with an LLM with a model str and an API key."""
@@ -218,8 +287,57 @@ class ChatLLM:
         self.api_key = api_key
         if not self.api_key:
             raise ValueError("ANTHROPIC_API_KEY environment variable or api_key parameter must be set")
-        self.raw_logging = raw_logging # if this is true, will save local json files under /logs/llm_logs/ that detail the raw API calls.
+        self.raw_logging = raw_logging  # Use the passed parameter instead of hardcoding
+        print(f"\n[DEBUG] ChatLLM initialized with raw_logging={self.raw_logging}")
 
+    @classmethod
+    def add_fake_response(cls, response_data: Dict[str, Any], status_code: int = 200):
+        """
+        Add a fake response to be returned instead of making an API call.
+        Responses will be returned in FIFO order (first added = first returned).
+        Each response is used exactly once and then removed from the queue.
+
+        Args:
+            response_data: The response data to return. Should match the format of real API responses:
+                         For Anthropic, this is typically a dict with a "content" key containing
+                         a list of content blocks (text, tool_use, etc.)
+            status_code: The HTTP status code to return with the response. Defaults to 200.
+                       Can be used to simulate error conditions (e.g., 429 for rate limits).
+
+        Example:
+            ```python
+            ChatLLM.add_fake_response({
+                "content": [{"type": "text", "text": "Test response"}]
+            })
+            ```
+        """
+        cls._fake_responses.append((response_data, status_code))
+        cls._using_fake_responses = True
+        print(f"\n[DEBUG] Added fake response (total: {len(cls._fake_responses)})")
+        if isinstance(response_data.get("content"), list):
+            # For structured responses, show the types of content blocks
+            content_types = [block.get("type") for block in response_data["content"] if isinstance(block, dict)]
+            print(f"[DEBUG] Response contains content blocks: {content_types}")
+        elif isinstance(response_data.get("content"), str):
+            # For simple text responses, show a preview
+            preview = response_data["content"][:100] + "..." if len(response_data["content"]) > 100 else response_data["content"]
+            print(f"[DEBUG] Response contains text: {preview}")
+
+    @classmethod
+    def clear_fake_responses(cls):
+        """
+        Clear all fake responses from the queue.
+
+        Example:
+            ```python
+            def tearDown(self):
+                ChatLLM.clear_fake_responses()
+            ```
+        """
+        count = len(cls._fake_responses)
+        cls._fake_responses = []
+        cls._using_fake_responses = False
+        print(f"\n[DEBUG] Cleared {count} fake response(s)")
 
     def _filter_messages(self, messages: List[Dict[str, Any]]) -> str:
         """
@@ -258,10 +376,15 @@ class ChatLLM:
         with open(log_file, "w") as f:
             json.dump(payload, f, indent=2, default=str)
 
-
     async def _make_api_request(self, url: str, payload: Dict[str, Any], headers: Dict[str, str]):
         """
         Generic method to make API requests with proper error handling.
+        Supports fake responses for testing purposes.
+
+        If fake responses have been added via add_fake_response(), this method will:
+        1. Return and remove the oldest fake response instead of making an API call
+        2. Return the specified status code with the fake response
+        3. Raise NoRemainingFakeResponsesError if fake responses run out
 
         Args:
             url: API endpoint URL
@@ -270,10 +393,36 @@ class ChatLLM:
 
         Returns:
             Response data and status code as a tuple (response_data, status_code)
+
+        Raises:
+            NoRemainingFakeResponsesError: If fake responses were used but have run out
+            Exception: For API errors (status != 200) or network issues
         """
+
         # Log the API payload if raw_logging is enabled
         if self.raw_logging:
             self._log_api_payload(payload)
+
+
+        # Check for fake responses first
+        if self._fake_responses:
+            response_data, status_code = self._fake_responses.pop(0)
+            remaining = len(self._fake_responses)
+            print(f"\n[DEBUG] Using fake response (remaining: {remaining})")
+            if isinstance(response_data.get("content"), list):
+                content_types = [block.get("type") for block in response_data["content"] if isinstance(block, dict)]
+                print(f"[DEBUG] Response contains content blocks: {content_types}")
+            return response_data, status_code
+        elif self._using_fake_responses:
+            # If we were using fake responses but ran out, raise an error
+            print("\n[DEBUG] ERROR: No remaining fake responses but _using_fake_responses=True")
+            raise NoRemainingFakeResponsesError(
+                "No remaining fake responses. This error is raised instead of making real "
+                "API calls when fake responses were previously added but have run out. "
+                "This usually indicates that more API calls are being made than expected."
+            )
+
+
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -307,90 +456,9 @@ class ChatLLM:
             raise error
 
 
-
-class OpenAIResponse(LLMResponse):
-    """
-    OpenAI-specific response wrapper that inherits from LLMResponse.
-
-    Handles the specific format of OpenAI's API responses, including:
-    - Processing message content with potential tool_calls
-    - Extracting tool calls from the response
-    - Converting OpenAI's tool call format to the standardized format
-
-    Properties:
-        response_data (Dict[str, Any]): The full OpenAI API response data
-    """
-
-    def __init__(self, response_data: Dict[str, Any], status_code: int = 200, raw_logging: bool = False):
-        """
-        Initialize an OpenAI response wrapper.
-
-        Args:
-            response_data: The full OpenAI API response data
-            status_code: HTTP status code of the response
-            raw_logging: Whether to log the parsed response to a file
-        """
-        self.response_data = response_data
-        # Extract content from the OpenAI response structure
-        content = ""
-        if "choices" in response_data and len(response_data["choices"]) > 0:
-            message = response_data["choices"][0].get("message", {})
-            content = message.get("content", "")
-
-        # Initialize the base class with the extracted content
-        super().__init__(content, status_code, raw_logging)
-
-    def _process_content(self):
-        """
-        Process OpenAI response format to extract tool calls and results.
-
-        OpenAI's format differs from Anthropic:
-        - Tool calls are in the 'tool_calls' field of the message
-        - Each tool call has an 'id', 'function' object with 'name' and 'arguments'
-        """
-        if "choices" in self.response_data and len(self.response_data["choices"]) > 0:
-            message = self.response_data["choices"][0].get("message", {})
-
-            # Extract tool calls from the message
-            openai_tool_calls = message.get("tool_calls", [])
-            for tool_call in openai_tool_calls:
-                if isinstance(tool_call, dict) and "function" in tool_call:
-                    # Convert OpenAI's tool call format to our standardized format
-                    function_data = tool_call.get("function", {})
-
-                    # Parse arguments from string to dict
-                    tool_input = {}
-                    try:
-                        arguments = function_data.get("arguments", "{}")
-                        tool_input = json.loads(arguments)
-                    except json.JSONDecodeError:
-                        # If JSON parsing fails, use the raw string
-                        tool_input = {"raw_arguments": arguments}
-
-                    # Create ToolCall Pydantic model
-                    pydantic_tool_call = ToolCall(
-                        id=tool_call.get("id", ""),
-                        name=function_data.get("name", ""),
-                        input=tool_input,
-                        type="function",
-                        server_executed=False
-                    )
-                    self.tool_calls.append(pydantic_tool_call)
-
-        # OpenAI doesn't have server-side tool results in the same way as Anthropic
-        # This would need to be updated if that changes
-
-    def get_text_content(self) -> str:
-        """
-        Extract text content from OpenAI response.
-
-        Returns:
-            str: The content field from the message in the first choice
-        """
-        if "choices" in self.response_data and len(self.response_data["choices"]) > 0:
-            message = self.response_data["choices"][0].get("message", {})
-            return message.get("content", "")
-        return ""
+class NoRemainingFakeResponsesError(Exception):
+    """Raised when fake responses were used but have run out."""
+    pass
 
 
 class ChatAnthropic(ChatLLM):
@@ -481,95 +549,13 @@ class ChatAnthropic(ChatLLM):
             payload,
             headers
         )
+
+        # # save response content to the list within the json file called fake_calls.json, which has a single key "fake_calls"
+        # with open("testing/fake_anthropic_calls.json", "r") as f:
+        #     fake_calls = json.load(f)
+        # fake_calls["fake_calls"].append(response_data)
+        # with open("testing/fake_anthropic_calls.json", "w") as f:
+        #     json.dump(fake_calls, f, indent=2, default=str)
+
+
         return AnthropicResponse(response_data.get("content", []), status_code=status_code, raw_logging=self.raw_logging)
-
-
-class ChatOpenAI(ChatLLM):
-    """OpenAI API client with tool calling support."""
-
-    async def ainvoke(
-        self,
-        messages: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        server_tools: Optional[Dict[str, Dict[str, Any]]] = None,
-        tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
-        **kwargs,
-    ) -> OpenAIResponse:
-        """
-        Invoke the OpenAI model with messages and optional tool calling support.
-
-        Args:
-            messages: The messages to send to the model (can include system messages)
-            tools: List of client-side tools in OpenAI format
-            server_tools: Dictionary of server-side tools (not directly supported by OpenAI)
-            tool_choice: Tool choice configuration ("auto", "any", or specific tool)
-            **kwargs: Additional kwargs to pass to the model
-
-        Returns:
-            OpenAIResponse with the model's response and status code
-        """
-        # This is a placeholder implementation
-        # When implementing, you should:
-        # 1. Convert system messages to OpenAI format (they handle system messages differently)
-        # 2. Convert tools to OpenAI's function calling format
-        # 3. Make the API request to OpenAI
-        # 4. Wrap the response in an OpenAIResponse object
-
-        raise NotImplementedError("OpenAI support is not yet implemented")
-
-        # Example implementation outline (needs to be completed):
-        """
-        # Extract system message if present
-        system_content = None
-        filtered_messages = []
-        for message in messages:
-            if message.get("role") == "system":
-                system_content = message.get("content", "")
-            else:
-                filtered_messages.append(message)
-
-        # If system message exists, add it in OpenAI's format
-        if system_content:
-            filtered_messages.insert(0, {"role": "system", "content": system_content})
-
-        # Convert tools to OpenAI format if provided
-        openai_tools = []
-        if tools:
-            for tool in tools:
-                openai_tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": tool.get("name"),
-                        "description": tool.get("description"),
-                        "parameters": tool.get("input_schema", {})
-                    }
-                })
-
-        # Build API payload
-        payload = {
-            "model": self.model,
-            "messages": filtered_messages,
-            **{k: v for k, v in kwargs.items() if k in ["temperature", "max_tokens"]}
-        }
-
-        if openai_tools:
-            payload["tools"] = openai_tools
-        if tool_choice:
-            payload["tool_choice"] = tool_choice
-
-        # Make API call
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
-
-        # Make the API request
-        response_data, status_code = await self._make_api_request(
-            "https://api.openai.com/v1/chat/completions",
-            payload,
-            headers
-        )
-
-        # Return the response wrapped in an OpenAIResponse
-        return OpenAIResponse(response_data, status_code=status_code, raw_logging=self.raw_logging)
-        """

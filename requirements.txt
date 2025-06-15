@@ -1,6 +1,8 @@
 pydantic
 langchain-core
 langgraph
+langchain-anthropic
+langchain-openai
 python-dotenv
 PyJWT
 cryptography
@@ -15,3 +17,4 @@ google-genai
 redis
 fastapi
 uvicorn[standard]
+curses
