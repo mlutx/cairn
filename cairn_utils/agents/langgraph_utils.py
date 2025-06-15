@@ -17,6 +17,7 @@ from langgraph.graph import StateGraph, END
 
 from agent_consts import AgentState
 from thought_logger import AgentLogger
+from llm_consts import LLMResponse, ToolCall
 
 
 def create_user_message(content: str) -> Dict[str, Any]:
@@ -25,7 +26,7 @@ def create_user_message(content: str) -> Dict[str, Any]:
 
 
 def create_assistant_message(
-    content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
+    content: str, tool_calls: Optional[List[ToolCall]] = None
 ) -> Dict[str, Any]:
     """Create an assistant message in the proper format with optional tool calls."""
     # For Anthropic's format, tool calls are embedded in the content blocks
@@ -41,9 +42,9 @@ def create_assistant_message(
             content_blocks.append(
                 {
                     "type": "tool_use",
-                    "id": tool_call["id"],
-                    "name": tool_call["name"],
-                    "input": tool_call["input"],
+                    "id": tool_call.id,
+                    "name": tool_call.name,
+                    "input": tool_call.input,
                 }
             )
 
@@ -177,7 +178,7 @@ async def query_llm_get_new_state(
     print_raw_llm_response: bool = False,
     max_attempts: int = 20,
     max_backoff: int = 300
-):
+) -> tuple[LLMResponse, AgentState]:
     """
     Query the LLM with retry logic and exponential backoff for transient errors.
 
@@ -222,63 +223,23 @@ async def query_llm_get_new_state(
             if print_raw_llm_response:
                 print(f"\n[DEBUG] RAW LLM RESPONSE: \n     {response}")
 
-            # Parse the response
-            assistant_content = ""
-            tool_calls = []
-            server_tool_results = {}
+            # Get text content and tool calls using the LLMResponse interface
+            assistant_content = response.get_text_content()
+            tool_calls = response.get_tool_calls()  # List[ToolCall] pydantic models
+            server_tool_results = response.get_tool_results()  # Dict[str, ToolResult] pydantic models
 
-            if isinstance(response.content, str):
-                assistant_content = response.content
-            elif isinstance(response.content, list):
-                # First pass: collect all content blocks for debugging
-                content_blocks_debug = []
-                for content_block in response.content:
-                    content_blocks_debug.append({
-                        "type": content_block.get("type"),
-                        "id": content_block.get("id", content_block.get("tool_use_id")),
-                        "name": content_block.get("name")
-                    })
+            # Log the content blocks for debugging
+            content_blocks_debug = []
+            for tool_call in tool_calls:
+                content_blocks_debug.append({
+                    "type": tool_call.type,
+                    "id": tool_call.id,
+                    "name": tool_call.name
+                })
 
-                print(f"\n[DEBUG] Found {len(response.content)} content blocks: {content_blocks_debug}")
-
-                # Second pass: process content blocks
-                for content_block in response.content:
-                    if content_block.get("type") == "text":
-                        assistant_content += content_block.get("text", "")
-                    elif content_block.get("type") == "tool_use":
-                        tool_calls.append(
-                            {
-                                "id": content_block.get("id"),
-                                "name": content_block.get("name"),
-                                "input": content_block.get("input", {}),
-                            }
-                        )
-                    elif content_block.get("type") == "server_tool_use":
-                        # Server-side tool execution (like web_search)
-                        tool_calls.append(
-                            {
-                                "id": content_block.get("id"),
-                                "name": content_block.get("name"),
-                                "input": content_block.get("input", {}),
-                                "server_executed": True,  # Mark as server-executed
-                            }
-                        )
-                    elif content_block.get("type") == "web_search_tool_result":
-                        # Store server-side tool results
-                        tool_use_id = content_block.get("tool_use_id")
-                        if tool_use_id:
-                            server_tool_results[tool_use_id] = content_block
-                            print(f"\n[DEBUG] Stored server tool result for tool_use_id: {tool_use_id}")
-
-                print(f"\n[DEBUG] Found {len(tool_calls)} tool calls and {len(server_tool_results)} server tool results")
-                print(f"[DEBUG] Server tool results keys: {list(server_tool_results.keys())}")
-                print(f"[DEBUG] Tool call IDs: {[tc.get('id') for tc in tool_calls]}")
-            else:
-                # Unexpected format - try to convert to string
-                assistant_content = str(response.content)
-                print(
-                    f"\n[DEBUG] Unexpected response.content format: {type(response.content)}, converting to string"
-                )
+            print(f"\n[DEBUG] Found {len(tool_calls)} tool calls and {len(server_tool_results)} server tool results")
+            print(f"[DEBUG] Server tool results keys: {list(server_tool_results.keys())}")
+            print(f"[DEBUG] Tool call IDs: {[tc.id for tc in tool_calls]}")
 
             # Extract clean thought and process repo memory
             analysis_content = extract_tag_info(assistant_content, "analysis")
@@ -303,10 +264,10 @@ async def query_llm_get_new_state(
             new_state = AgentState(
                 user_input=state.user_input,
                 messages=full_messages + [assistant_message],  # Keep full history in state
-                tool_calls=tool_calls.copy(),
+                tool_calls=tool_calls,  # Now directly using ToolCall pydantic models
                 most_recent_thought=clean_thought,
                 tool_outputs=state.tool_outputs,  # Keep existing tool outputs
-                server_tool_results=server_tool_results,  # Store server-side tool results
+                server_tool_results=server_tool_results,  # Now directly using ToolResult pydantic models
             )
 
             return response, new_state
@@ -405,7 +366,7 @@ async def tool_execution_node(
     tool_output_entries = []
 
     for tool_call in state.tool_calls:
-        tool_id, tool_name, tool_input = tool_call["id"], tool_call["name"], tool_call["input"]
+        tool_id, tool_name, tool_input = tool_call.id, tool_call.name, tool_call.input
         print(f"\n[DEBUG] Executing tool: {tool_name} (ID: {tool_id})")
 
         # Execute the tool and get the result
@@ -455,84 +416,62 @@ async def tool_execution_node(
     )
 
 
-async def _execute_single_tool(tool_call: Dict[str, Any], tools_dict: Dict[str, Any], state: AgentState) -> tuple[Any, bool]:
+async def _execute_single_tool(tool_call: ToolCall, tools_dict: Dict[str, Any], state: AgentState) -> tuple[Any, bool]:
     """
     Execute a single tool call and return the output and error status.
 
+    Args:
+        tool_call: ToolCall pydantic model containing the tool call information
+        tools_dict: Dictionary mapping tool names to tool definitions
+        state: Current agent state
+
     Returns:
-        tuple: (tool_output, is_error)
+        tuple[Any, bool]: (tool_output, is_error) where tool_output is the result and is_error indicates if an error occurred
     """
-    tool_id, tool_name, tool_input = tool_call["id"], tool_call["name"], tool_call["input"]
+    if tool_call.server_executed:
+        return await _handle_server_tool(tool_call, state)
+    return await _handle_client_tool(tool_call, tools_dict)
 
-    # Check if this tool was executed server-side
-    if tool_call.get("server_executed", False):
-        # Handle server-executed tools (like web_search)
-        server_tool_results = state.server_tool_results
-        print(f"\n[DEBUG] Looking for server tool results for ID: {tool_id}")
-        print(f"[DEBUG] Available server tool result IDs: {list(server_tool_results.keys())}")
 
-        if tool_id in server_tool_results:
-            # Extract and format the server-side results
-            search_result = server_tool_results[tool_id]
-            search_content = search_result.get("content", [])
+async def _handle_server_tool(tool_call: ToolCall, state: AgentState) -> tuple[Any, bool]:
+    """Handle execution of server-side tools like web_search."""
+    tool_id, tool_name = tool_call.id, tool_call.name
+    server_tool_results = state.server_tool_results
 
-            # Format the results for the tool output
-            formatted_results = []
-            for item in search_content:
-                if item.get("type") == "web_search_result":
-                    formatted_results.append({
-                        "title": item.get("title", ""),
-                        "url": item.get("url", ""),
-                        "encrypted_content": item.get("encrypted_content", ""),
-                        "page_age": item.get("page_age", "")
-                    })
+    if tool_id not in server_tool_results:
+        error_msg = f"Server-executed tool {tool_name} (ID: {tool_id}) results not found. Available IDs: {list(server_tool_results.keys())}"
+        return error_msg, True
 
-            tool_output = {
-                "query": tool_input.get("query", ""),
-                "results": formatted_results,
-                "status": "success",
-                "server_executed": True,
-                "instructions": "Web search completed by Anthropic's server-side tool."
-            }
-            return tool_output, False
-        else:
-            # Check if we can find the result with any available ID
-            available_ids = list(server_tool_results.keys())
-            error_message = f"Server-executed tool {tool_name} (ID: {tool_id}) results not found. Available IDs: {available_ids}. This suggests Anthropic's server may have only executed some of the web searches in the batch."
-            print(f"\n[DEBUG] {error_message}")
+    search_result = server_tool_results[tool_id]
+    tool_output = {
+        "result": search_result.content,
+        "status": "success",
+        "server_executed": True,
+        "instructions": f"Tool {tool_name} executed by the server."
+    }
 
-            # For web search, provide a fallback response indicating the search wasn't executed
-            if tool_name == "web_search":
-                tool_output = {
-                    "query": tool_input.get("query", ""),
-                    "results": [],
-                    "status": "not_executed",
-                    "server_executed": False,
-                    "instructions": "This web search was not executed by Anthropic's server. This can happen when multiple web searches are requested simultaneously."
-                }
-                return tool_output, False
-            else:
-                return error_message, True
-    else:
-        # Check if tool exists for client-side execution
-        tool_definition = tools_dict.get(tool_name)
-        if not tool_definition:
-            error_message = f"Tool {tool_name} not found"
-            return error_message, True
-        else:
-            # Execute the tool client-side
-            try:
-                tool_function = tool_definition.get("function")
-                tool_output = await tool_function(tool_input)
+    return tool_output, False
 
-                # Handle None output
-                if tool_output is None:
-                    tool_output = {"result": "No output returned from tool"}
-                return tool_output, False
 
-            except Exception as e:
-                error_message = f"Error executing tool {tool_name}: {str(e)}"
-                return error_message, True
+async def _handle_client_tool(tool_call: ToolCall, tools_dict: Dict[str, Any]) -> tuple[Any, bool]:
+    """Handle execution of client-side tools."""
+    tool_name = tool_call.name
+    tool_definition = tools_dict.get(tool_name)
+
+    if not tool_definition:
+        return f"Tool {tool_name} not found", True
+
+    try:
+        tool_function = tool_definition.get("function")
+        tool_output = await tool_function(tool_call.input)
+
+        if tool_output is None:
+            return {"result": "No output returned from tool"}, False
+
+        return tool_output, False
+
+    except Exception as e:
+        return f"Error executing tool {tool_name}: {str(e)}", True
 
 
 def _check_for_task_completion(messages: List[Dict]) -> bool:

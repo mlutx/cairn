@@ -11,17 +11,29 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688.svg)](https://fastapi.tiangolo.com/)
 [![Contributing](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](.github/CONTRIBUTING.md)
 
-[🚀 Quick Start](#-quick-start) | [📖 Documentation](https://try-cairn.com) | <span style="margin-left:-5px">[<img src="https://logos-world.net/wp-content/uploads/2020/12/Discord-Emblem.png" alt="Discord" width="30" height="15" style="position:relative; top:3px; margin-right:-7px;"/> Discord](https://discord.gg/C67EdrKN)</span> | [🐛 Issues](https://github.com/cairn-dev/cairn/issues) | [🤝 Contributing](.github/CONTRIBUTING.md)
+[🚀 Quick Start](#-quick-start) | [📖 Documentation](https://try-cairn.com) | [<img src="https://logos-world.net/wp-content/uploads/2020/12/Discord-Emblem.png" alt="Discord" width="30" height="15" style="position:relative; top:3px; margin-right:-7px;"/> Discord](https://discord.gg/C67EdrKN) | [🐛 Issues](https://github.com/cairn-dev/cairn/issues) | [🤝 Contributing](.github/CONTRIBUTING.md)
 
 </div>
 
+# Table of Contents
+
+- [What is Cairn?](#-what-is-cairn)
+  - [Model Support](#model-support)
+- [Quick Start](#quick-start)
+  - [Installation](#installation)
+- [Architecture Overview](#architecture-overview)
+- [Development](#development)
+  - [Project Structure](#project-structure)
+  - [Contributing](#contributing)
+- [License](#license)
+- [Roadmap](#roadmap)
 
 ## 🪨 What is Cairn?
 
 Cairn is a simple open-source background-agent system. Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
 You can run Cairn locally, connect it to your repos, use your favorite LLM and execute fullstack tasks, 100% in the background. Save time for the things you want to do, not the boring stuff!
 
-### 🤖 Model Support
+### Model Support
 
 | Provider | Status | Models |
 |----------|--------|---------|
@@ -29,7 +41,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 | 🟡 **OpenAI** | 🚧 Coming Soon |
 | 🟡 **Gemini** | 🚧 Coming Soon |
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -146,7 +158,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    ```
 ---
 
-### 🏃 Running Cairn
+### Running Cairn
 
 #### Option 1 (recommended): Simple static HTML page.
 ```bash
@@ -178,7 +190,7 @@ COMING SOON
 
 ---
 
-## ⚙️ Cairn Settings & Memory
+## Cairn Settings & Memory
 
 Cairn maintains local configuration and memory through a `.cairn/` directory that gets automatically created in your project root when you run tasks locally.
 
@@ -224,7 +236,7 @@ Cairn maintains local configuration and memory through a `.cairn/` directory tha
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```mermaid
 graph TB
@@ -261,7 +273,7 @@ For example, if you assign a task like "retrieve user metrics from our supabase 
 We use subprocess to spawn multiple parallel processes, SQLite as a persistent database, and FastAPI to provide a simple frontend.
 
 
-## 🛠️ Development
+## Development
 
 ### Project Structure
 
@@ -303,11 +315,11 @@ We provide several issue templates to help you report bugs, request features, or
 
 When submitting a pull request, please use our [Pull Request Template](.github/pull_request_template.md) to ensure your contribution includes all the necessary information.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🗺️ Roadmap
+## Roadmap
 
 ### Current Version (v0.1.0)
 - ✅ Multi-agent task execution
@@ -315,11 +327,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - ✅ Simple web interface
 
 ### Coming Soon
-- 🌐 OpenAI & Gemini support
-- 🖥️ Agent-runnable code environments
-- ▶️ Pausable, playable, restartable tasks
-- 🎯 Custom diff-application models
-- 🔍 Embedding search support (auto-updating with github webhooks)
+- OpenAI & Gemini support
+- Agent-runnable code environments
+- Pausable, playable, restartable tasks
+- Custom diff-application models
+- Embedding search support (auto-updating with github webhooks)
 - and more...
 
 

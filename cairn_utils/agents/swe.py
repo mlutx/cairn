@@ -65,7 +65,8 @@ class SoftwareEngineerAgent:
         subtask_id=None,
         running_locally=False,
         running_from_pm=False,
-        other_agents=None
+        other_agents=None,
+        fake_calls_path: str = None
     ):
         """
         Set up the agent with necessary components.
@@ -85,6 +86,7 @@ class SoftwareEngineerAgent:
             running_from_pm (bool): Whether running from project manager
             other_agents (list[dict]): list of other agents' info to use for coordination.
             -> dict should have keys of run_id, description, and repo (each keyed to a string)
+            fake_calls_path (str): Path to JSON file containing fake LLM responses for testing
 
         Returns:
             SoftwareEngineerAgent: The configured agent instance
@@ -103,7 +105,7 @@ class SoftwareEngineerAgent:
         # Setup clients and dependencies
         await self._setup_clients()
         await self._setup_toolbox(owner, repos, installation_id, branch, model_name)
-        self._setup_llm_and_logger(llm_client, model_name)
+        self._setup_llm_and_logger(llm_client, model_name, fake_calls_path)
         await self._setup_graph(repos, branch)
 
         if self.live_logging:
@@ -131,7 +133,7 @@ class SoftwareEngineerAgent:
         if self.live_logging:
             print(f"Authentication complete. Branch '{branch}' ready.")
 
-    def _setup_llm_and_logger(self, llm_client, model_name):
+    def _setup_llm_and_logger(self, llm_client, model_name, fake_calls_path=None):
         """Setup LLM client and logger."""
         if not self.logger:
             self.logger = AgentLogger(
@@ -139,6 +141,18 @@ class SoftwareEngineerAgent:
             )
 
         self.llm_client = llm_client or ChatAnthropic(model=model_name)
+
+        # Load fake responses if path is provided
+        if fake_calls_path and os.path.exists(fake_calls_path):
+            try:
+                with open(fake_calls_path, "r") as f:
+                    fake_calls = json.load(f)
+                for fake_call in fake_calls.get("fake_calls", []):
+                    self.llm_client.add_fake_response(fake_call)
+                if self.live_logging:
+                    print(f"Loaded fake responses from {fake_calls_path}")
+            except Exception as e:
+                raise RuntimeError(f"Failed to load fake responses from {fake_calls_path}. This is a fatal error as test responses are required: {str(e)}")
 
     async def _setup_graph(self, repos, branch):
         """Create and configure the agent graph."""
@@ -244,10 +258,10 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
     branch = f"swe-agent-test-{timestamp}"
 
     # Create a unique run ID
-    run_id = f"testrun123"
+    run_id = branch
 
     # Demonstration of a task
-    task_description = "please try searching the internet for stripe documentation, then call generate output with info that describes the documentation you found."
+    task_description = "please call the view repositoiry structure tool. in the next iteration the list files tool. then in the next call the web search tool, please (and summarize the results)"
 
     # Create and setup the agent
     agent = SoftwareEngineerAgent()
@@ -266,6 +280,7 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
         #     "description": "add a function to the backend that fetches a string of random emojis",
         #     "repo": "cairn-dev/backend"
         # }]
+        fake_calls_path="testing/fake_anthropic_calls.json"
     )
 
     # Run the agent and write final state to JSON

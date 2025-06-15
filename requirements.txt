@@ -1,6 +1,8 @@
 pydantic
 langchain-core
 langgraph
+langchain-anthropic
+langchain-openai
 python-dotenv
 PyJWT
 cryptography
