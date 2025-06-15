@@ -261,7 +261,7 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
     run_id = branch
 
     # Demonstration of a task
-    task_description = "please call the view repositoiry structure tool, then gneerate an output describing what you saw."
+    task_description = "Please add a random emoji endpoint that returns a 10-length str of random emojis. "
 
     # Create and setup the agent
     agent = SoftwareEngineerAgent()

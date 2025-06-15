@@ -64,6 +64,7 @@ from tool_related_prompts import (
     REPO_MEMORY_PROMPT_NO_MEM,
     REPO_MEMORY_PROMPT_HAS_MEM,
 )
+from supported_models import SUPPORTED_MODELS, find_supported_model_given_model_name
 
 class DefaultToolBox:
     """
@@ -657,7 +658,11 @@ class DefaultToolBox:
                     original_content = ""
                     # print(f"File '{file_path}' doesn't exist, creating new file with blank content")
 
-                llm_client = ChatAnthropic(model=self.model_name)
+                # find associated LLM client given model name...
+                provider, model_info = find_supported_model_given_model_name(self.model_name)
+                chat_class = model_info['chat_class']
+
+                llm_client = chat_class(model=self.model_name)
 
                 # Format the user message with the original content and edit suggestions
                 user_message = EDIT_FILE_USER_MESSAGE.format(

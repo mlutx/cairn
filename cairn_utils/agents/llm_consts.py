@@ -674,6 +674,11 @@ class ChatOpenAI(ChatLLM):
         if system_prompt:
             openai_messages.append({"role": "system", "content": system_prompt})
 
+        # append a message that enforces that the system will always include content blocks
+        # NOTE: idk why this is necessary, but without it, it seems to often just call tools without any explanation / reasoning.
+        # Unclear if that actually degrades performance, but it's a good idea to enforce it.
+        openai_messages.append({"role": "developer", "content": "You must always include content blocks in your response. You must always explain your reasoning and steps."})
+
         # Process other messages
         for message in filtered_messages:
             role = message["role"]

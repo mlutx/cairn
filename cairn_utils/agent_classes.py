@@ -16,15 +16,15 @@ from tool_types import ExplorerResponse, PMResponse, PMResponseWithPR, SWERespon
 from toolbox import DefaultToolBox
 
 
-def structure_fcn_for_anthropic(tools):
+def structure_fcn_for_tool_calling(tools):
     """
-    Format tools for Anthropic's tool calling API.
+    Format tools for Tool calling.
 
     Args:
         tools: A list of tuples where each tuple contains (function, function_name, function_schema)
 
     Returns:
-        A list of dictionaries formatted for Anthropic's tool calling API.
+        A list of dictionaries formatted for most LLMs that support tool calling.
     """
 
     tools_structured = []
@@ -131,7 +131,7 @@ class CodeEditorToolBox(DefaultToolBox):
 
         tools.append(self.get_batch_tool_call_tool(tool_name_2_function))
 
-        return structure_fcn_for_anthropic(tools)
+        return structure_fcn_for_tool_calling(tools)
 
     def get_generate_output_tool(self):
         async def generate_output(input: dict) -> dict:
@@ -242,7 +242,7 @@ class ManagerToolBox(DefaultToolBox):
         tools = list(tool_name_2_function.values())
         tools.append(self.get_batch_tool_call_tool(tool_name_2_function))
 
-        return structure_fcn_for_anthropic(tools)
+        return structure_fcn_for_tool_calling(tools)
 
     async def create_pull_request_for_branch(self, pr_title: str, pr_body: str) -> dict:
         """
@@ -406,7 +406,7 @@ class ExplorerToolBox(DefaultToolBox):
 
         tools.append(self.get_batch_tool_call_tool(tool_name_2_function))
 
-        return structure_fcn_for_anthropic(tools)
+        return structure_fcn_for_tool_calling(tools)
 
     def get_generate_output_tool(self):
         async def generate_output(input: dict) -> ExplorerResponse:
