@@ -127,7 +127,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    ```
    You'll need these three values for your `.env` file in the next step:
    - **App ID**: Your GitHub App ID
-   - **Installation ID**: From the installation URL
+   - **Installation ID**: From the installation URL (see step 2)
    - **Private Key Path**: Path to your downloaded .pem file
 
    ```
@@ -151,7 +151,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
    # Anthropic API key (REQUIRED) - Get from https://console.anthropic.com/
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   ANTHROPIC_MODEL_NAME=claude-sonnet-4-20250514
+   OPENAI_API_KEY=your_openai_api_key_here
 
    # Connected repositories - Format: "owner/repo-name,owner/repo-name" (comma-separated, no spaces)
    # Examples:
