@@ -7,14 +7,17 @@ import sys
 import threading
 import time
 import traceback
+import re
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import httpx
 
 # TODO: do this in a better way, this is hacky
 # Add the parent directory to Python path so we can import cairn_utils
@@ -139,8 +142,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Cairn Task Manager API", version="1.0.0", lifespan=lifespan)
 
-# Mount static files directory (relative to project root, not fastapi_app)
-app.mount("/static", StaticFiles(directory="./static"), name="static")
+# Get the absolute path to the project root directory
+PROJECT_ROOT = Path(__file__).parent.parent.absolute()
+STATIC_DIR = PROJECT_ROOT / "static"
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Use absolute path to ensure database is found regardless of working directory
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cairn_tasks.db")
@@ -309,8 +316,101 @@ async def root():
 
 @app.get("/")
 async def serve_ui():
-    """Serve the HTML UI"""
-    return FileResponse("static/index.html")
+    """Serve the main UI"""
+    return FileResponse(str(STATIC_DIR / "index.html"))
+
+@app.get("/repos")
+async def serve_repos_ui():
+    """Serve the repository management UI"""
+    return FileResponse(str(STATIC_DIR / "repos.html"))
+
+@app.get("/repos/{owner}/{repo}")
+async def serve_repo_details_ui(owner: str, repo: str):
+    """Serve the repository details UI"""
+    return FileResponse(str(STATIC_DIR / "repo-details.html"))
+
+@app.get("/api/repos")
+async def get_repos():
+    """Get list of connected repositories"""
+    if not worker_manager:
+        raise HTTPException(status_code=503, detail="WorkerManager not initialized")
+    return {
+        "repos": [{"owner": owner, "repo": repo} for owner, repo in worker_manager.connected_repos]
+    }
+
+@app.post("/api/repos")
+async def add_repo(repo: dict):
+    """Add a new repository"""
+    if not worker_manager:
+        raise HTTPException(status_code=503, detail="WorkerManager not initialized")
+    
+    owner = repo.get("owner")
+    repo_name = repo.get("repo")
+    
+    if not owner or not repo_name:
+        raise HTTPException(status_code=400, detail="Both owner and repo are required")
+    
+    # Add to connected repos
+    if (owner, repo_name) not in worker_manager.connected_repos:
+        worker_manager.connected_repos.append((owner, repo_name))
+        
+        # Update environment variable
+        repos_str = ",".join([f"{o}/{r}" for o, r in worker_manager.connected_repos])
+        os.environ["CONNECTED_REPOS"] = repos_str
+        
+        # Update .env file
+        with open(".env", "r") as f:
+            env_content = f.read()
+        
+        if "CONNECTED_REPOS=" in env_content:
+            # Replace existing CONNECTED_REPOS line
+            env_content = re.sub(
+                r"CONNECTED_REPOS=.*",
+                f"CONNECTED_REPOS={repos_str}",
+                env_content
+            )
+        else:
+            # Add new CONNECTED_REPOS line
+            env_content += f"\nCONNECTED_REPOS={repos_str}\n"
+        
+        with open(".env", "w") as f:
+            f.write(env_content)
+    
+    return {"message": f"Repository {owner}/{repo_name} added successfully"}
+
+@app.delete("/api/repos/{owner}/{repo}")
+async def delete_repo(owner: str, repo: str):
+    """Remove a repository"""
+    if not worker_manager:
+        raise HTTPException(status_code=503, detail="WorkerManager not initialized")
+    
+    # Remove from connected repos
+    if (owner, repo) in worker_manager.connected_repos:
+        worker_manager.connected_repos.remove((owner, repo))
+        
+        # Update environment variable
+        repos_str = ",".join([f"{o}/{r}" for o, r in worker_manager.connected_repos])
+        os.environ["CONNECTED_REPOS"] = repos_str
+        
+        # Update .env file
+        with open(".env", "r") as f:
+            env_content = f.read()
+        
+        if "CONNECTED_REPOS=" in env_content:
+            # Replace existing CONNECTED_REPOS line
+            env_content = re.sub(
+                r"CONNECTED_REPOS=.*",
+                f"CONNECTED_REPOS={repos_str}",
+                env_content
+            )
+        else:
+            # Add new CONNECTED_REPOS line
+            env_content += f"\nCONNECTED_REPOS={repos_str}\n"
+        
+        with open(".env", "w") as f:
+            f.write(env_content)
+    
+    return {"message": f"Repository {owner}/{repo} removed successfully"}
 
 @app.get("/config")
 async def get_config():
@@ -874,6 +974,111 @@ async def delete_active_task(task_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to delete task: {str(e)}")
     finally:
         conn.close()
+
+@app.get("/api/repos/{owner}/{repo}/stats")
+async def get_repo_stats(owner: str, repo: str):
+    """Get repository statistics including contributors and code ownership"""
+    if not worker_manager:
+        raise HTTPException(status_code=503, detail="WorkerManager not initialized")
+    
+    try:
+        # Get GitHub token from environment
+        github_token = os.getenv("GITHUB_TOKEN")
+        if not github_token:
+            raise HTTPException(
+                status_code=500,
+                detail="GitHub token not configured. Please set the GITHUB_TOKEN environment variable."
+            )
+
+        # Fetch repository data using GitHub API
+        headers = {
+            "Authorization": f"token {github_token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+
+        async with httpx.AsyncClient() as client:
+            # Get contributors
+            contributors_response = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo}/contributors",
+                headers=headers
+            )
+            if contributors_response.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Repository {owner}/{repo} not found")
+            contributors_response.raise_for_status()
+            contributors = contributors_response.json()
+
+            # Get languages
+            languages_response = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo}/languages",
+                headers=headers
+            )
+            languages_response.raise_for_status()
+            languages = languages_response.json()
+
+            # Get commit activity
+            commits_response = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo}/commits",
+                headers=headers,
+                params={"per_page": 100}  # Get last 100 commits
+            )
+            commits_response.raise_for_status()
+            commits = commits_response.json()
+
+            # Process commit data to get file ownership
+            file_ownership = {}
+            for commit in commits:
+                commit_sha = commit["sha"]
+                commit_details = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/commits/{commit_sha}",
+                    headers=headers
+                )
+                commit_details.raise_for_status()
+                commit_data = commit_details.json()
+                
+                for file in commit_data.get("files", []):
+                    filename = file["filename"]
+                    author = commit_data["commit"]["author"]["name"]
+                    if filename not in file_ownership:
+                        file_ownership[filename] = {"authors": {}, "last_modified": None}
+                    
+                    file_ownership[filename]["authors"][author] = file_ownership[filename]["authors"].get(author, 0) + 1
+                    if not file_ownership[filename]["last_modified"]:
+                        file_ownership[filename]["last_modified"] = commit_data["commit"]["author"]["date"]
+
+            # Calculate contributor statistics
+            contributor_stats = []
+            for contributor in contributors:
+                contributor_stats.append({
+                    "login": contributor["login"],
+                    "avatar_url": contributor["avatar_url"],
+                    "contributions": contributor["contributions"],
+                    "html_url": contributor["html_url"]
+                })
+
+            # Calculate language statistics
+            total_bytes = sum(languages.values())
+            language_stats = [
+                {
+                    "name": lang,
+                    "percentage": round((bytes / total_bytes) * 100, 2)
+                }
+                for lang, bytes in languages.items()
+            ]
+
+            return {
+                "owner": owner,
+                "repo": repo,
+                "contributors": contributor_stats,
+                "languages": language_stats,
+                "file_ownership": file_ownership
+            }
+
+    except httpx.HTTPError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail=f"Repository {owner}/{repo} not found")
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

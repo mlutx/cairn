@@ -903,7 +903,7 @@
 
                 // Update status bar
                 const statusBar = document.getElementById('status-bar');
-                statusBar.textContent = `✓ ${config.connected_repos.length} repos`;
+                statusBar.innerHTML = `<a href="/repos" style="color: inherit; text-decoration: none;">Repository Manager <span style="font-size: 0.9em; opacity: 0.8;">(${config.connected_repos.length} repos)</span></a>`;
                 statusBar.classList.remove('hidden');
                 statusBar.style.fontSize = '12px';
                 statusBar.style.padding = '5px 10px';
@@ -912,6 +912,7 @@
                 statusBar.style.right = '10px';
                 statusBar.style.margin = '0';
                 statusBar.style.borderRadius = '4px';
+                statusBar.style.cursor = 'pointer';
             } catch (error) {
                 showAlert(`Failed to load config: ${error.message}`, 'error');
                 const statusBar = document.getElementById('status-bar');

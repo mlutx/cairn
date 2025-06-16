@@ -62,11 +62,9 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 3. **Set up github access**
 
-   Cairn uses a self-hosted GitHub app (you own and control it) with read/write permissions to edit your repositories.
+   Cairn uses a self-hosted GitHub app (which you own and control) with read/write permissions to edit your repositories.
 
-   ```
-   Step 1: Create your GitHub App
-   ```
+   #### Step 1: Create your GitHub App
 
    **For Personal Account:**
    1. Navigate to [GitHub Apps Settings](https://github.com/settings/apps)
@@ -97,9 +95,8 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
    4. Click **"Create GitHub App"** to finish
 
-   ```
-   Step 2: Gather your credentials (3 required values)
-   ```
+   #### Step 2: Gather your credentials (3 required values)
+
    ```
    • App ID: Copy from app settings page (displayed at top)
    • Private Key: Generate and download .pem file → save to cairn project root
@@ -107,9 +104,8 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
      Then check browser URL: https://github.com/settings/installations/[INSTALLATION_ID]
    ```
 
-   ```
-   Step 3: Note your credentials for .env configuration
-   ```
+   #### Step 3: Note your credentials for .env configuration
+   
    You'll need these three values for your `.env` file in the next step:
    - **App ID**: Your GitHub App ID
    - **Installation ID**: From the installation URL
@@ -167,7 +163,7 @@ COMING SOON
 
 ### Your First Task
 
-1. **Access the interface** (web or terminal)
+1. **Access the interface** 
 2. **Select an agent type** (Fullstack Planner, PM, or SWE)
 - SWE: recommended for simple self-contained subtasks. Output is a branch with the changes.
 - PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR.
