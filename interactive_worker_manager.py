@@ -178,7 +178,7 @@ class WorkerManager:
             subprocess_logger.error(f"Failed to start subprocess for task {task_id}: {str(e)}")
             raise
 
-    def create_task_sync(self, agent_type: str, description: str, repos: List[str]) -> str:
+    def create_task_sync(self, agent_type: str, description: str, repos: List[str], model_provider: str = "anthropic", model_name: Optional[str] = None) -> str:
         """Create a new task synchronously and start a worker process"""
         try:
             self.add_debug_message(f"Creating task with agent_type='{agent_type}', description='{description[:50]}...', repos={repos}")
@@ -200,7 +200,9 @@ class WorkerManager:
                     "agent_output": {},
                     "agent_status": "Queued",
                     "agent_type": agent_type,
-                    "raw_logs_dump": {}
+                    "raw_logs_dump": {},
+                    "model_provider": model_provider,
+                    "model_name": model_name
                 }
             else:  # SWE or PM
                 payload = {
@@ -215,7 +217,9 @@ class WorkerManager:
                     "agent_type": agent_type,
                     "related_run_ids": [],
                     "raw_logs_dump": {},
-                    "branch": None
+                    "branch": None,
+                    "model_provider": model_provider,
+                    "model_name": model_name
                 }
 
             logger.debug(f"Created payload: {payload}")
@@ -1219,10 +1223,17 @@ class WorkerManager:
 
                                     if repo:
                                         # Create the PM task
+                                        # Get model info from parent task
+                                        parent_task = tasks[self.selected_task_idx]
+                                        model_provider = parent_task.get('model_provider', 'anthropic')
+                                        model_name = parent_task.get('model_name')
+
                                         task_id = self.create_task_sync(
                                             "PM",
                                             f"{title}\n\n{subtask}",
-                                            [repo]
+                                            [repo],
+                                            model_provider=model_provider,
+                                            model_name=model_name
                                         )
                                         self.add_debug_message(f"Created PM task {task_id} for subtask: {title}")
                                     else:
@@ -1309,7 +1320,14 @@ class WorkerManager:
                         self.add_debug_message(f"Attempting to create task: agent_type={agent_type}, repos={repos}")
 
                         # Create task
-                        task_id = self.create_task_sync(agent_type, self.task_description, repos)
+                        # Use default model info since this is from the CLI interface
+                        task_id = self.create_task_sync(
+                            agent_type=agent_type,
+                            description=self.task_description,
+                            repos=repos,
+                            model_provider="anthropic",
+                            model_name=os.getenv("ANTHROPIC_MODEL_NAME")
+                        )
                         logger.info(f"Created task {task_id} with agent type: {agent_type}")
                         self.add_debug_message(f"Successfully created task {task_id}")
                         self.current_screen = "main"

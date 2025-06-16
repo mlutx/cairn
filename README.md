@@ -38,8 +38,11 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 | Provider | Status | Models |
 |----------|--------|---------|
 | 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5 |
-| 🟡 **OpenAI** | 🚧 Coming Soon |
+| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo |
 | 🟡 **Gemini** | 🚧 Coming Soon |
+| 🟡 **Deepseek** | 🚧 Coming Soon |
+| 🟡 **Llama** | 🚧 Coming Soon |
+
 
 ## Quick Start
 
@@ -124,7 +127,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    ```
    You'll need these three values for your `.env` file in the next step:
    - **App ID**: Your GitHub App ID
-   - **Installation ID**: From the installation URL
+   - **Installation ID**: From the installation URL (see step 2)
    - **Private Key Path**: Path to your downloaded .pem file
 
    ```
@@ -148,7 +151,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
    # Anthropic API key (REQUIRED) - Get from https://console.anthropic.com/
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   ANTHROPIC_MODEL_NAME=claude-sonnet-4-20250514
+   OPENAI_API_KEY=your_openai_api_key_here
 
    # Connected repositories - Format: "owner/repo-name,owner/repo-name" (comma-separated, no spaces)
    # Examples:
@@ -335,12 +338,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - and more...
 
 
-<!--
+
 <div align="center">
 
 [![Star History Chart](https://api.star-history.com/svg?repos=cairn-dev/cairn&type=Date)](https://www.star-history.com/#cairn-dev/cairn&Date)
 
-</div> -->
+</div>
 
 ---
 

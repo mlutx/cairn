@@ -30,6 +30,7 @@ try:
     )
     from .swe import SoftwareEngineerAgent
     from .thought_logger import AgentLogger
+    from supported_models import find_supported_model_given_model_name
 except (ImportError, ModuleNotFoundError):
     # Add parent directory to path for tools and supabase_utils
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -57,6 +58,7 @@ except (ImportError, ModuleNotFoundError):
     )
     from llm_consts import ChatAnthropic
     from swe import SoftwareEngineerAgent
+    from supported_models import find_supported_model_given_model_name, SUPPORTED_MODELS
 
 
 class ProjectManagerAgent:
@@ -81,7 +83,8 @@ class ProjectManagerAgent:
         repos: list[str],
         installation_id: int,
         branch: str,
-        model_name: str = "claude-3-7-sonnet-latest",
+        model_provider: str,
+        model_name: str,
         llm_client=None,
         live_logging=False,
         subtask_id=None,
@@ -123,7 +126,8 @@ class ProjectManagerAgent:
         self.running_locally = running_locally
         self.other_agents = other_agents
         self.subtask_id = None
-
+        self.model_provider = model_provider
+        self.model_name = model_name
         # Setup clients and dependencies
         await self._setup_clients()
         await self._setup_swe_agent(owner, repos, installation_id, branch, model_name, run_id)
@@ -190,7 +194,15 @@ class ProjectManagerAgent:
                 run_id=self.run_id,
             )
 
-        self.llm_client = llm_client or ChatAnthropic(model=model_name)
+        # find the correct chat client
+        chat_info = SUPPORTED_MODELS[self.model_provider]
+        if not self.model_name in chat_info['models']:
+            print('-'*50)
+            print(f'[DEBUG] Model {self.model_name} not found in {self.model_provider} models. May not be supported!')
+            print('-'*50)
+
+        chat_client = chat_info['chat_class']
+        self.llm_client = chat_client(model=model_name)
 
         # Load fake responses if path is provided
         if fake_calls_path and os.path.exists(fake_calls_path):

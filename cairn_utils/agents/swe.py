@@ -22,7 +22,7 @@ from task_storage import TaskStorage
 
 # Add current directory to sys.path for agent_consts
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from llm_consts import ChatAnthropic
+from llm_consts import ChatAnthropic, ChatOpenAI
 from agent_consts import AgentState, STRUCTURED_SWE_PROMPT
 from thought_logger import AgentLogger
 # from supabase_utils import get_supabase_client, get_other_agents_from_subtask_id
@@ -33,6 +33,7 @@ from langgraph_utils import (
     print_run_end,
     format_other_agents_info,
 )
+from supported_models import find_supported_model_given_model_name, SUPPORTED_MODELS
 
 
 class SoftwareEngineerAgent:
@@ -57,7 +58,8 @@ class SoftwareEngineerAgent:
         repos: list[str],
         installation_id: int,
         branch: str,
-        model_name: str = "claude-3-7-sonnet-latest",
+        model_provider: str,
+        model_name: str,
         llm_client=None,
         live_logging=False,
         supabase_client=None,
@@ -101,6 +103,8 @@ class SoftwareEngineerAgent:
         self.subtask_id = subtask_id
         self.running_locally = running_locally
         self.other_agents = other_agents
+        self.model_provider = model_provider
+        self.model_name = model_name
 
         # Setup clients and dependencies
         await self._setup_clients()
@@ -140,7 +144,16 @@ class SoftwareEngineerAgent:
                 run_id=self.run_id,
             )
 
-        self.llm_client = llm_client or ChatAnthropic(model=model_name)
+        # find the correct chat client
+        chat_info = SUPPORTED_MODELS[self.model_provider]
+        if not self.model_name in chat_info['models']:
+            print('-'*50)
+            print(f'[DEBUG] Model {self.model_name} not found in {self.model_provider} models. May not be supported!')
+            print('-'*50)
+
+        chat_client = chat_info['chat_class']
+        self.llm_client = chat_client(model=model_name)
+
 
         # Load fake responses if path is provided
         if fake_calls_path and os.path.exists(fake_calls_path):
@@ -261,7 +274,7 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
     run_id = branch
 
     # Demonstration of a task
-    task_description = "please call the view repositoiry structure tool. in the next iteration the list files tool. then in the next call the web search tool, please (and summarize the results)"
+    task_description = "please try using the edit file descriptively tool to add a random emoji endpoint that returns a 10-length str of random emojis. "
 
     # Create and setup the agent
     agent = SoftwareEngineerAgent()
@@ -273,14 +286,15 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
         live_logging=True,
         run_id=run_id,
         # subtask_id="970f06f8-03de-4e76-9386-6feed924358c",
-        model_name="claude-sonnet-4-20250514",
+        model_provider="openai",
+        model_name="gpt-4o",
         running_locally=True,
         # other_agents = [{
         #     "run_id": "test_run_SEE_OTHER_AGENTS2",
         #     "description": "add a function to the backend that fetches a string of random emojis",
         #     "repo": "cairn-dev/backend"
         # }]
-        fake_calls_path="testing/fake_anthropic_calls.json"
+        # fake_calls_path="testing/fake_anthropic_calls.json"
     )
 
     # Run the agent and write final state to JSON

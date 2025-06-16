@@ -501,6 +501,7 @@ class ChatAnthropic(ChatLLM):
         Returns:
             AnthropicResponse with the model's response and status code
         """
+        print(f'\n[DEBUG] ChatAnthropic.ainvoke() called with model: {self.model}')
 
         system_prompt, filtered_messages = self._filter_messages(messages)
 
@@ -559,3 +560,235 @@ class ChatAnthropic(ChatLLM):
 
 
         return AnthropicResponse(response_data.get("content", []), status_code=status_code, raw_logging=self.raw_logging)
+
+
+
+class OpenAIResponse(LLMResponse):
+    """
+    OpenAI-specific response wrapper that inherits from LLMResponse.
+
+    Handles parsing of OpenAI API responses to extract tool calls, tool results, and text content.
+    """
+
+    def __init__(self, content: Union[Dict[str, Any], List[Dict[str, Any]]], status_code: int = 200, raw_logging: bool = False):
+        """
+        Initialize an OpenAI response wrapper.
+
+        Args:
+            content: Raw content from the OpenAI API response (typically a dict with 'choices')
+            status_code: HTTP status code of the response
+            raw_logging: Whether to log the parsed response to a file
+        """
+
+        super().__init__(content, status_code, raw_logging)
+
+    def _process_content(self):
+        """
+        Process OpenAI response to extract tool calls and text content.
+
+        OpenAI returns responses with a 'choices' array, where each choice has a 'message' with:
+        - 'content': The text response (can be null if tool calls are present)
+        - 'tool_calls': List of tool call objects (optional)
+        - 'finish_reason': Indicates if response stopped due to tool calls
+        """
+
+        # get the first choice
+        if isinstance(self.content, dict) and 'choices' in self.content:
+            message_content = self.content['choices'][0].get('message', {})
+            self.finish_reason = self.content['choices'][0].get('finish_reason', '')
+        else:
+            message_content = self.content
+            self.finish_reason = ''
+
+
+        # parse messages content...
+        text_content = message_content['content']
+        self.text_content = text_content if text_content else ""
+
+        # parse tool calls...
+        for tool_call in message_content.get("tool_calls", []):
+            id = tool_call.get("id")
+            function = tool_call.get("function")
+            name = function.get("name")
+            args = function.get("arguments")
+
+            # load the args (OpenAI uses a json string for the args)
+            args = json.loads(args)
+            self.tool_calls.append(
+                ToolCall(
+                    id=id,
+                    name=name,
+                    input=args,
+                    type="tool_use",
+                    server_executed=False
+                )
+            )
+
+
+
+
+class ChatOpenAI(ChatLLM):
+    """OpenAI API client with tool calling support."""
+
+    def __init__(self, model: str, api_key: Optional[str] = None, raw_logging: bool = False):
+        """
+        Initialize an OpenAI API client.
+
+        Args:
+            model: The OpenAI model to use (e.g., 'gpt-4o')
+            api_key: Optional API key. If not provided, will try to get it from environment
+            raw_logging: Whether to log API calls and responses to files
+        """
+        # Get API key from environment if not provided
+        if not api_key:
+            api_key = os.environ.get("OPENAI_API_KEY")
+
+        super().__init__(model, api_key, raw_logging)
+
+    async def ainvoke(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        server_tools: Optional[Dict[str, Dict[str, Any]]] = None,
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
+        **kwargs,
+    ) -> OpenAIResponse:
+        """
+        Invoke the OpenAI model with messages and optional tool calling support.
+
+        Args:
+            messages: The messages to send to the model (can include system messages)
+            tools: List of client-side tools in OpenAI format
+            server_tools: Dictionary of server-side tools (not supported by OpenAI, included for compatibility)
+            tool_choice: Tool choice configuration ("auto", "none", or {"type": "function", "function": {"name": "tool_name"}})
+            **kwargs: Additional kwargs to pass to the model (e.g., temperature, max_tokens)
+
+        Returns:
+            OpenAIResponse with the model's response and status code
+        """
+
+
+        # check if kwargs contains a key called 'use_predictive_outputs
+        use_predictive_output = kwargs.get("use_predictive_output", False)
+        if use_predictive_output:
+            print(f"\n[DEBUG] ChatOpenAI.ainvoke() called with use_predictive_output=True")
+            # now get the predictive content from the kwargs
+            predictive_content = kwargs.get("predictive_content", "")
+        else:
+            print(f"\n[DEBUG] ChatOpenAI.ainvoke() called with use_predictive_output=False")
+
+        print(f'\n[DEBUG] ChatOpenAI.ainvoke() called with model: {self.model}')
+        system_prompt, filtered_messages = self._filter_messages(messages)
+
+        # Convert messages to OpenAI format
+        openai_messages = []
+
+        # Add system message if present
+        if system_prompt:
+            openai_messages.append({"role": "system", "content": system_prompt})
+
+        # append a message that enforces that the system will always include content blocks
+        # NOTE: idk why this is necessary, but without it, it seems to often just call tools without any explanation / reasoning.
+        # Unclear if that actually degrades performance, but it's a good idea to enforce it.
+        openai_messages.append({"role": "developer", "content": "You must always include content blocks in your response. You must always explain your reasoning and steps."})
+
+        # Process other messages
+        for message in filtered_messages:
+            role = message["role"]
+            content = message["content"]
+
+            # Handle string content directly
+            if isinstance(content, str):
+                openai_messages.append({"role": role, "content": content})
+                continue
+
+            # Handle list content (tool results, etc)
+            if isinstance(content, list):
+                # For assistant messages with tool calls
+                if role == "assistant":
+                    msg = {"role": role, "content": "", "tool_calls": []}
+                    for block in content:
+                        if block["type"] == "text":
+                            msg["content"] = block["text"]
+                        elif block["type"] == "tool_use":
+                            msg["tool_calls"].append({
+                                "id": block["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": block["name"],
+                                    "arguments": json.dumps(block["input"])
+                                }
+                            })
+                    openai_messages.append(msg)
+                # For user messages with tool results
+                elif role == "user":
+                    tool_results = []
+                    for block in content:
+                        if block["type"] == "tool_result":
+                            tool_results.append({
+                                "tool_call_id": block["tool_use_id"],
+                                "role": "tool",
+                                "name": block.get("name", ""),  # OpenAI needs the tool name
+                                "content": str(block["content"])  # Convert content to string
+                            })
+                    # Add tool results as separate messages
+                    openai_messages.extend(tool_results)
+
+        # Build API payload
+        payload = {
+            "model": self.model,
+            "messages": openai_messages,
+            "max_tokens": kwargs.get("max_tokens", 4096),
+            **{k: v for k, v in kwargs.items() if k in ["temperature", "top_p"]}
+        }
+        if use_predictive_output:
+            payload["prediction"] = {
+                "type": "content",
+                "content":predictive_content
+            }
+
+        # Format tools for OpenAI
+        if tools:
+            payload["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.get("name", ""),
+                        "description": tool.get("description", ""),
+                        "parameters": tool.get("input_schema", {}),
+                        "strict": False # enforce strict schema.
+                    }
+                } for tool in tools
+            ]
+
+            # set additionalParameters to be false
+            for tool in payload["tools"]:
+                tool["function"]["parameters"]["additionalProperties"] = False
+
+            payload["tool_choice"] = "auto" # let openai select which (if any) tools to use...
+
+        # Make API call
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+
+        # Log the API payload if raw_logging is enabled
+        if self.raw_logging:
+            self._log_api_payload(payload)
+
+        # Make the API request and wrap the response
+        response_data, status_code = await self._make_api_request(
+            "https://api.openai.com/v1/chat/completions",
+            payload,
+            headers
+        )
+
+        # save response content to the list within the json file called fake_calls.json, which has a single key "fake_calls"
+        # with open("testing/fake_openai_calls.json", "r") as f:
+        #     fake_calls = json.load(f)
+        # fake_calls["fake_calls"].append(response_data)
+        # with open("testing/fake_openai_calls.json", "w") as f:
+        #     json.dump(fake_calls, f, indent=2, default=str)
+
+        return OpenAIResponse(response_data, status_code=status_code, raw_logging=self.raw_logging)

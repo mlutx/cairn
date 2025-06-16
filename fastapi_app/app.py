@@ -271,6 +271,8 @@ class AgentPayload(BaseModel):
     """Payload model for agent tasks"""
     # Common fields
     description: str
+    model_provider: Optional[str] = None
+    model_name: Optional[str] = None
 
     # Fullstack Planner specific
     repos: Optional[list] = None
@@ -433,12 +435,6 @@ async def kickoff_agent(request: KickoffAgentRequest):
         logger.error("WorkerManager not initialized")
         raise HTTPException(status_code=503, detail="WorkerManager not initialized")
 
-    # Get model name from environment or use default
-    model_name = os.getenv("ANTHROPIC_MODEL_NAME", "claude-3-sonnet-20240229")
-    if not model_name or not isinstance(model_name, str):
-        logger.error(f"Invalid model name: {model_name}")
-        raise HTTPException(status_code=500, detail="Invalid model name configuration")
-
     # Validate payload based on agent type
     if request.agent_type == "Fullstack Planner":
         if not request.payload.repos:
@@ -474,10 +470,16 @@ async def kickoff_agent(request: KickoffAgentRequest):
             raise HTTPException(status_code=400, detail="Description cannot be empty")
 
         # Use WorkerManager's create_task_sync method
+        # Get model info from request - don't add defaults as per user request
+        model_provider = request.payload.model_provider
+        model_name = request.payload.model_name
+
         task_id = worker_manager.create_task_sync(
             agent_type=request.agent_type,
             description=description,
-            repos=repos
+            repos=repos,
+            model_provider=model_provider,
+            model_name=model_name
         )
 
         if not task_id:
@@ -684,6 +686,11 @@ async def create_subtasks_from_fullstack_planner(request: CreateSubtasksRequest)
                     logger.info(f"Creating task with pre-generated ID {pre_generated_id}")
 
                     # Create the task in the database with the pre-generated ID
+                    # Get model info from parent task - don't add defaults as per user request
+                    parent_task = task_storage.get_active_task(request.fullstack_planner_run_id)
+                    model_provider = parent_task.get('model_provider')
+                    model_name = parent_task.get('model_name')
+
                     worker_payload = {
                         "run_id": pre_generated_id,
                         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -699,7 +706,9 @@ async def create_subtasks_from_fullstack_planner(request: CreateSubtasksRequest)
                         "parent_fullstack_id": request.fullstack_planner_run_id,
                         "subtask_index": i,
                         "raw_logs_dump": {},
-                        "branch": None
+                        "branch": None,
+                        "model_provider": model_provider,
+                        "model_name": model_name
                     }
 
                     try:
@@ -721,10 +730,17 @@ async def create_subtasks_from_fullstack_planner(request: CreateSubtasksRequest)
                     logger.info(f"No pre-generated ID found, creating new task using WorkerManager")
                     try:
                         # Create a new task using WorkerManager if no pre-generated ID
+                        # Get model info from parent task - don't add defaults as per user request
+                        parent_task = task_storage.get_active_task(request.fullstack_planner_run_id)
+                        model_provider = parent_task.get('model_provider')
+                        model_name = parent_task.get('model_name')
+
                         task_id = worker_manager.create_task_sync(
                             agent_type=agent_type,
                             description=f"{title}\n\n{subtask_desc}",
-                            repos=[repo]
+                            repos=[repo],
+                            model_provider=model_provider,
+                            model_name=model_name
                         )
                         logger.info(f"Created new task with ID: {task_id}")
 

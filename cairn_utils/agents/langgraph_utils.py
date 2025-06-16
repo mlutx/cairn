@@ -149,16 +149,32 @@ def truncate_conversation_history(full_messages: List[Dict[str, Any]], max_call_
 
     # check whether we have an incomplete interaction cycle (shouldn't happen, but just in case)
     if len(conversation_messages) % 2 != 0:
-        raise ValueError("Incomplete interaction cycle detected.")
+        print(f"\n[DEBUG] Warning: Incomplete interaction cycle detected ({len(conversation_messages)} messages). Continuing with truncation anyway.")
+        # Handle incomplete cycle by adjusting the calculation to work with odd numbers
+        incomplete_cycle = True
+    else:
+        incomplete_cycle = False
 
     # check whether we have enough messages to truncate
-    to_truncate = len(conversation_messages) // 2 > max_call_stack
+    complete_cycles = len(conversation_messages) // 2
+    to_truncate = complete_cycles > max_call_stack
 
     if not to_truncate:
         return full_messages.copy()
 
-    non_truncated_messages = conversation_messages[-(max_call_stack * 2):]
-    truncated_messages = conversation_messages[:-(max_call_stack * 2)]
+    # Calculate how many messages to keep, accounting for incomplete cycles
+    if incomplete_cycle:
+        # Keep max_call_stack complete cycles plus the incomplete message
+        messages_to_keep = (max_call_stack * 2) + 1
+    else:
+        # Keep max_call_stack complete cycles
+        messages_to_keep = max_call_stack * 2
+
+    # Ensure we don't try to keep more messages than we have
+    messages_to_keep = min(messages_to_keep, len(conversation_messages))
+
+    non_truncated_messages = conversation_messages[-messages_to_keep:]
+    truncated_messages = conversation_messages[:-messages_to_keep]
     truncation_notice = create_user_message(
             f"[System Notice: Truncated {len(truncated_messages)} older messages to preserve context length. "
             f"Kept {len(non_truncated_messages) // 2} recent interaction cycles. Use analysis of recent interactions to gain context about prior work.]"
@@ -226,6 +242,7 @@ async def query_llm_get_new_state(
             # Get text content and tool calls using the LLMResponse interface
             assistant_content = response.get_text_content()
             tool_calls = response.get_tool_calls()  # List[ToolCall] pydantic models
+            print(f'\n[DEBUG] Tool calls: {tool_calls}')
             server_tool_results = response.get_tool_results()  # Dict[str, ToolResult] pydantic models
 
             # Log the content blocks for debugging
@@ -264,7 +281,7 @@ async def query_llm_get_new_state(
             new_state = AgentState(
                 user_input=state.user_input,
                 messages=full_messages + [assistant_message],  # Keep full history in state
-                tool_calls=tool_calls,  # Now directly using ToolCall pydantic models
+                tool_calls=[ToolCall(**tc.model_dump()) for tc in tool_calls],  # Convert to dict and back to ensure proper instantiation
                 most_recent_thought=clean_thought,
                 tool_outputs=state.tool_outputs,  # Keep existing tool outputs
                 server_tool_results=server_tool_results,  # Now directly using ToolResult pydantic models
