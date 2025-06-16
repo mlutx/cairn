@@ -676,7 +676,7 @@ class DefaultToolBox:
                 ]
 
                 # Make the LLM call
-                response = await llm_client.ainvoke(messages)
+                response = await llm_client.ainvoke(messages, use_predictive_output=True, predictive_content=edit_suggestions)
 
                 # Extract the response content
                 if isinstance(response.content, str):

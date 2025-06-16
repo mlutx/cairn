@@ -501,6 +501,7 @@ class ChatAnthropic(ChatLLM):
         Returns:
             AnthropicResponse with the model's response and status code
         """
+        print(f'\n[DEBUG] ChatAnthropic.ainvoke() called with model: {self.model}')
 
         system_prompt, filtered_messages = self._filter_messages(messages)
 
@@ -665,6 +666,18 @@ class ChatOpenAI(ChatLLM):
         Returns:
             OpenAIResponse with the model's response and status code
         """
+
+
+        # check if kwargs contains a key called 'use_predictive_outputs
+        use_predictive_output = kwargs.get("use_predictive_output", False)
+        if use_predictive_output:
+            print(f"\n[DEBUG] ChatOpenAI.ainvoke() called with use_predictive_output=True")
+            # now get the predictive content from the kwargs
+            predictive_content = kwargs.get("predictive_content", "")
+        else:
+            print(f"\n[DEBUG] ChatOpenAI.ainvoke() called with use_predictive_output=False")
+
+        print(f'\n[DEBUG] ChatOpenAI.ainvoke() called with model: {self.model}')
         system_prompt, filtered_messages = self._filter_messages(messages)
 
         # Convert messages to OpenAI format
@@ -728,6 +741,11 @@ class ChatOpenAI(ChatLLM):
             "max_tokens": kwargs.get("max_tokens", 4096),
             **{k: v for k, v in kwargs.items() if k in ["temperature", "top_p"]}
         }
+        if use_predictive_output:
+            payload["prediction"] = {
+                "type": "content",
+                "content":predictive_content
+            }
 
         # Format tools for OpenAI
         if tools:
@@ -767,10 +785,10 @@ class ChatOpenAI(ChatLLM):
         )
 
         # save response content to the list within the json file called fake_calls.json, which has a single key "fake_calls"
-        with open("testing/fake_openai_calls.json", "r") as f:
-            fake_calls = json.load(f)
-        fake_calls["fake_calls"].append(response_data)
-        with open("testing/fake_openai_calls.json", "w") as f:
-            json.dump(fake_calls, f, indent=2, default=str)
+        # with open("testing/fake_openai_calls.json", "r") as f:
+        #     fake_calls = json.load(f)
+        # fake_calls["fake_calls"].append(response_data)
+        # with open("testing/fake_openai_calls.json", "w") as f:
+        #     json.dump(fake_calls, f, indent=2, default=str)
 
         return OpenAIResponse(response_data, status_code=status_code, raw_logging=self.raw_logging)

@@ -30,7 +30,7 @@ SUPPORTED_MODELS = {
         "chat_class": ChatOpenAI,
         "response_class": OpenAIResponse,
         "models": [
-            "gpt-4.1"
+            "gpt-4.1",
             "gpt-4o-mini",
             "gpt-4o",
             "gpt-4",
@@ -81,3 +81,7 @@ def find_supported_model_given_model_name(model_name: str, allow_fuzzy_match: bo
             return best_match_provider, best_match_info
 
     return None, None
+
+
+if __name__ == "__main__":
+    print(find_supported_model_given_model_name("gpt-4.1"))
