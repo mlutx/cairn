@@ -52,19 +52,23 @@ def create_assistant_message(
 
 
 def create_tool_result_message(
-    tool_use_id: str, content: str, is_error: bool = False
+    tool_use_id: str, content: str, is_error: bool = False, name: str = None
 ) -> Dict[str, Any]:
     """Create a tool result message in the proper format."""
+    tool_result = {
+        "type": "tool_result",
+        "tool_use_id": tool_use_id,
+        "content": content,
+        "is_error": is_error,
+    }
+
+    # Add name if provided
+    if name:
+        tool_result["name"] = name
+
     return {
         "role": "user",
-        "content": [
-            {
-                "type": "tool_result",
-                "tool_use_id": tool_use_id,
-                "content": content,
-                "is_error": is_error,
-            }
-        ],
+        "content": [tool_result],
     }
 
 
@@ -394,7 +398,8 @@ async def tool_execution_node(
         tool_result_content = {
             "type": "tool_result",
             "tool_use_id": tool_id,
-            "content": output_str
+            "content": output_str,
+            "name": tool_name  # Include the tool name
         }
         if is_error:
             tool_result_content["is_error"] = True
@@ -460,11 +465,15 @@ async def _handle_server_tool(tool_call: ToolCall, state: AgentState) -> tuple[A
         return error_msg, True
 
     search_result = server_tool_results[tool_id]
+    # Get the tool name from the search result or use the provided tool_name
+    result_tool_name = search_result.name if hasattr(search_result, "name") and search_result.name else tool_name
+
     tool_output = {
         "result": search_result.content,
         "status": "success",
         "server_executed": True,
-        "instructions": f"Tool {tool_name} executed by the server."
+        "name": result_tool_name,  # Include the tool name
+        "instructions": f"Tool {result_tool_name} executed by the server."
     }
 
     return tool_output, False

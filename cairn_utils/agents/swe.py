@@ -152,7 +152,7 @@ class SoftwareEngineerAgent:
             print('-'*50)
 
         chat_client = chat_info['chat_class']
-        self.llm_client = chat_client(model=model_name)
+        self.llm_client = chat_client(model=model_name, raw_logging=True)
 
 
         # Load fake responses if path is provided
@@ -274,7 +274,7 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
     run_id = branch
 
     # Demonstration of a task
-    task_description = "please try using the edit file descriptively tool to add a random emoji endpoint that returns a 10-length str of random emojis. "
+    task_description = "please add an endpoint that returns a random str of emojis."
 
     # Create and setup the agent
     agent = SoftwareEngineerAgent()
@@ -286,8 +286,8 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
         live_logging=True,
         run_id=run_id,
         # subtask_id="970f06f8-03de-4e76-9386-6feed924358c",
-        model_provider="openai",
-        model_name="gpt-4o",
+        model_provider="gemini",
+        model_name="gemini-2.0-flash",
         running_locally=True,
         # other_agents = [{
         #     "run_id": "test_run_SEE_OTHER_AGENTS2",
