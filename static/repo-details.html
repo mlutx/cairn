@@ -173,9 +173,9 @@
         }
 
         .owner-tag.primary {
-            background-color: #1f6feb;
-            border-color: #388bfd;
-            color: #f0f6fc;
+            background-color: #1a4b3a;
+            border-color: #2d6a4e;
+            color: #90ee90;
         }
 
         .search-box {
@@ -300,8 +300,37 @@
         <div id="loading" class="loading">Loading repository statistics...</div>
 
         <div id="content" style="display: none;">
+            <!-- Contributors and Team Contributions side by side at the top -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h2>Contributors</h2>
+                    <div id="contributors" class="contributor-list"></div>
+                </div>
+
+                <div class="stat-card">
+                    <h2>Relative Contributions</h2>
+                    <div class="chart-container">
+                        <canvas id="contributor-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Expertise -->
+            <div class="stat-card">
+                <h2>Team Expertise</h2>
+                <div id="expertise-grid" class="expertise-grid">
+                    <!-- Expertise cards will be dynamically added here -->
+                </div>
+            </div>
+
+            <!-- Languages -->
+            <div class="stat-card">
+                <h2>Languages</h2>
+                <div id="languages" class="language-list"></div>
+            </div>
+
             <!-- Commit Activity Visualization -->
-            <div class="visualization-card">
+            <div class="stat-card">
                 <h2>Commit Activity</h2>
                 <div class="commit-time-filters">
                     <button class="time-filter active" data-period="day">Time of Day</button>
@@ -313,34 +342,7 @@
                 </div>
             </div>
 
-            <!-- Team Contributions Visualization -->
-            <div class="visualization-card">
-                <h2>Team Contributions</h2>
-                <div class="chart-container">
-                    <canvas id="contributor-chart"></canvas>
-                </div>
-            </div>
-
-            <!-- Expertise Analysis -->
-            <div class="visualization-card">
-                <h2>Team Expertise</h2>
-                <div id="expertise-grid" class="expertise-grid">
-                    <!-- Expertise cards will be dynamically added here -->
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h2>Contributors</h2>
-                    <div id="contributors" class="contributor-list"></div>
-                </div>
-
-                <div class="stat-card">
-                    <h2>Languages</h2>
-                    <div id="languages" class="language-list"></div>
-                </div>
-            </div>
-
+            <!-- File Ownership -->
             <div class="stat-card">
                 <h2>File Ownership</h2>
                 <input type="text" id="file-search" class="search-box" placeholder="Search files...">
@@ -616,7 +618,7 @@
                     maintainAspectRatio: false,
                     plugins: {
                         title: {
-                            display: true,
+                            display: false,
                             text: 'Relative Contributions'
                         },
                         tooltip: {
