@@ -1038,8 +1038,15 @@ async def get_repo_stats(owner: str, repo: str):
             commits_response.raise_for_status()
             commits = commits_response.json()
 
-            # Process commit data to get file ownership
+            # Process commit data to get file ownership and commit timing
             file_ownership = {}
+            commit_times = {
+                'hour_of_day': [0] * 24,
+                'day_of_week': [0] * 7,
+                'month': [0] * 12
+            }
+            commit_authors = {}
+
             for commit in commits:
                 commit_sha = commit["sha"]
                 commit_details = await client.get(
@@ -1049,6 +1056,7 @@ async def get_repo_stats(owner: str, repo: str):
                 commit_details.raise_for_status()
                 commit_data = commit_details.json()
                 
+                # Process file ownership
                 for file in commit_data.get("files", []):
                     filename = file["filename"]
                     author = commit_data["commit"]["author"]["name"]
@@ -1058,6 +1066,40 @@ async def get_repo_stats(owner: str, repo: str):
                     file_ownership[filename]["authors"][author] = file_ownership[filename]["authors"].get(author, 0) + 1
                     if not file_ownership[filename]["last_modified"]:
                         file_ownership[filename]["last_modified"] = commit_data["commit"]["author"]["date"]
+                
+                # Process commit timing
+                if "commit" in commit_data and "author" in commit_data["commit"]:
+                    commit_date = commit_data["commit"]["author"]["date"]
+                    if commit_date:
+                        try:
+                            from datetime import datetime
+                            dt = datetime.strptime(commit_date, "%Y-%m-%dT%H:%M:%SZ")
+                            
+                            # Hour of day (0-23)
+                            hour = dt.hour
+                            commit_times['hour_of_day'][hour] += 1
+                            
+                            # Day of week (0=Monday, 6=Sunday)
+                            day = dt.weekday()
+                            commit_times['day_of_week'][day] += 1
+                            
+                            # Month (0=January, 11=December)
+                            month = dt.month - 1
+                            commit_times['month'][month] += 1
+                            
+                            # Track author commits
+                            author = commit_data["commit"]["author"]["name"]
+                            if author not in commit_authors:
+                                commit_authors[author] = {
+                                    'total': 0,
+                                    'hours': [0] * 24,
+                                    'days': [0] * 7
+                                }
+                            commit_authors[author]['total'] += 1
+                            commit_authors[author]['hours'][hour] += 1
+                            commit_authors[author]['days'][day] += 1
+                        except Exception as e:
+                            logger.error(f"Error parsing commit date: {e}")
 
             # Calculate contributor statistics
             contributor_stats = []
@@ -1084,7 +1126,9 @@ async def get_repo_stats(owner: str, repo: str):
                 "repo": repo,
                 "contributors": contributor_stats,
                 "languages": language_stats,
-                "file_ownership": file_ownership
+                "file_ownership": file_ownership,
+                "commit_times": commit_times,
+                "commit_authors": commit_authors
             }
 
     except httpx.HTTPError as e:

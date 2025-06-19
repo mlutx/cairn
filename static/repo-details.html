@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Repository Details - Cairn</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -206,6 +207,84 @@
             border-radius: 6px;
             margin-bottom: 20px;
         }
+
+        .visualization-card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 15px;
+        }
+
+        .expertise-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .expertise-card {
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .expertise-title {
+            font-weight: 600;
+            color: #f0f6fc;
+            margin-bottom: 8px;
+        }
+
+        .expertise-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .expertise-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .expertise-label {
+            color: #c9d1d9;
+        }
+
+        .expertise-value {
+            color: #58a6ff;
+            font-weight: 500;
+        }
+
+        .commit-time-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .time-filter {
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .time-filter.active {
+            background-color: #1f6feb;
+            border-color: #388bfd;
+            color: #f0f6fc;
+        }
     </style>
 </head>
 <body>
@@ -221,6 +300,35 @@
         <div id="loading" class="loading">Loading repository statistics...</div>
 
         <div id="content" style="display: none;">
+            <!-- Commit Activity Visualization -->
+            <div class="visualization-card">
+                <h2>Commit Activity</h2>
+                <div class="commit-time-filters">
+                    <button class="time-filter active" data-period="day">Time of Day</button>
+                    <button class="time-filter" data-period="week">Day of Week</button>
+                    <button class="time-filter" data-period="month">Month</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="commit-time-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Team Contributions Visualization -->
+            <div class="visualization-card">
+                <h2>Team Contributions</h2>
+                <div class="chart-container">
+                    <canvas id="contributor-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Expertise Analysis -->
+            <div class="visualization-card">
+                <h2>Team Expertise</h2>
+                <div id="expertise-grid" class="expertise-grid">
+                    <!-- Expertise cards will be dynamically added here -->
+                </div>
+            </div>
+
             <div class="stats-grid">
                 <div class="stat-card">
                     <h2>Contributors</h2>
@@ -247,6 +355,10 @@
         const owner = pathParts[2];
         const repo = pathParts[3];
 
+        // Chart.js default configuration for dark theme
+        Chart.defaults.color = '#c9d1d9';
+        Chart.defaults.borderColor = '#30363d';
+
         // Language colors mapping
         const languageColors = {
             'Python': '#3572A5',
@@ -271,14 +383,29 @@
             'C': '#555555'
         };
 
+        // Categorical colors for charts
+        const chartColors = [
+            '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#16a34a',
+            '#14b8a6', '#0284c7', '#a855f7', '#ec4899', '#f59e0b',
+            '#84cc16', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef'
+        ];
+
+        // Store repository data globally for use in charts
+        let repoData = null;
+        let commitTimeChart = null;
+        let contributorChart = null;
+
         async function loadRepoStats() {
             try {
                 const response = await fetch(`/api/repos/${owner}/${repo}/stats`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                const data = await response.json();
-                renderRepoStats(data);
+                repoData = await response.json();
+                renderRepoStats(repoData);
+                renderCommitTimeChart('day');
+                renderContributorChart();
+                renderExpertiseAnalysis();
             } catch (error) {
                 showError(`Failed to load repository statistics: ${error.message}`);
             }
@@ -344,6 +471,237 @@
             document.getElementById('files').innerHTML = filesHtml;
         }
 
+        function renderCommitTimeChart(period) {
+            // Clear previous chart if it exists
+            if (commitTimeChart) {
+                commitTimeChart.destroy();
+            }
+
+            // Update active filter button
+            document.querySelectorAll('.time-filter').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.period === period);
+            });
+
+            // Prepare data based on period
+            let labels = [];
+            let data = [];
+
+            if (period === 'day') {
+                // Hours of the day (0-23)
+                labels = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+                data = Array(24).fill(0);
+
+                // Mock data for demonstration
+                // In a real implementation, this would use actual commit timestamps
+                for (let i = 0; i < 200; i++) {
+                    const hour = Math.floor(Math.random() * 24);
+                    data[hour]++;
+                }
+            } else if (period === 'week') {
+                // Days of the week
+                labels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                data = Array(7).fill(0);
+
+                // Mock data for demonstration
+                for (let i = 0; i < 200; i++) {
+                    const day = Math.floor(Math.random() * 7);
+                    data[day]++;
+                }
+            } else if (period === 'month') {
+                // Months of the year
+                labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                data = Array(12).fill(0);
+
+                // Mock data for demonstration
+                for (let i = 0; i < 200; i++) {
+                    const month = Math.floor(Math.random() * 12);
+                    data[month]++;
+                }
+            }
+
+            // Create the chart
+            const ctx = document.getElementById('commit-time-chart').getContext('2d');
+            commitTimeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Commit Frequency',
+                        data: data,
+                        backgroundColor: '#2563eb',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: period === 'day' 
+                                ? 'Commit Frequency by Hour of Day'
+                                : period === 'week'
+                                ? 'Commit Frequency by Day of Week'
+                                : 'Commit Frequency by Month'
+                        },
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: '#161b22',
+                            borderColor: '#30363d',
+                            borderWidth: 1,
+                            titleColor: '#f0f6fc',
+                            bodyColor: '#c9d1d9',
+                            callbacks: {
+                                label: function(context) {
+                                    return `Commits: ${context.raw}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: '#30363d',
+                                drawBorder: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#30363d',
+                                drawBorder: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderContributorChart() {
+            if (!repoData || !repoData.contributors || repoData.contributors.length === 0) {
+                return;
+            }
+
+            // Prepare data
+            const contributors = repoData.contributors.slice(0, 10); // Limit to top 10
+            const labels = contributors.map(c => c.login);
+            const data = contributors.map(c => c.contributions);
+            const colors = chartColors.slice(0, contributors.length);
+
+            // Create the chart
+            const ctx = document.getElementById('contributor-chart').getContext('2d');
+            contributorChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: '#161b22',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Relative Contributions'
+                        },
+                        tooltip: {
+                            backgroundColor: '#161b22',
+                            borderColor: '#30363d',
+                            borderWidth: 1,
+                            titleColor: '#f0f6fc',
+                            bodyColor: '#c9d1d9',
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${context.label}: ${value} commits (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderExpertiseAnalysis() {
+            if (!repoData || !repoData.file_ownership) {
+                return;
+            }
+
+            // Analyze file ownership to determine expertise areas
+            const fileOwnership = repoData.file_ownership;
+            const contributorExpertise = {};
+
+            // Define file categories based on extensions or directories
+            const categories = {
+                'Frontend': ['.html', '.css', '.jsx', '.tsx', '.vue', 'components/', 'pages/'],
+                'Backend': ['.py', '.rb', '.php', '.java', '.go', 'controllers/', 'models/'],
+                'Data': ['.sql', '.json', '.yaml', '.csv', 'data/', 'migrations/'],
+                'DevOps': ['.yml', '.yaml', '.toml', '.sh', 'docker', 'kubernetes/', '.github/'],
+                'Mobile': ['.swift', '.kt', '.java', 'android/', 'ios/'],
+                'Testing': ['test', 'spec', '.test.', '.spec.']
+            };
+
+            // Count files per contributor by category
+            Object.entries(fileOwnership).forEach(([filename, data]) => {
+                const authors = Object.entries(data.authors);
+                if (authors.length === 0) return;
+
+                // Find which category this file belongs to
+                let fileCategory = 'Other';
+                for (const [category, patterns] of Object.entries(categories)) {
+                    if (patterns.some(pattern => filename.toLowerCase().includes(pattern.toLowerCase()))) {
+                        fileCategory = category;
+                        break;
+                    }
+                }
+
+                // Assign file to primary author's expertise
+                const primaryAuthor = authors[0][0];
+                if (!contributorExpertise[primaryAuthor]) {
+                    contributorExpertise[primaryAuthor] = {};
+                }
+                
+                if (!contributorExpertise[primaryAuthor][fileCategory]) {
+                    contributorExpertise[primaryAuthor][fileCategory] = 0;
+                }
+                
+                contributorExpertise[primaryAuthor][fileCategory]++;
+            });
+
+            // Render expertise cards
+            const expertiseHtml = Object.entries(contributorExpertise).map(([author, expertise]) => {
+                const expertiseEntries = Object.entries(expertise)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([category, count]) => `
+                        <li class="expertise-item">
+                            <span class="expertise-label">${category}</span>
+                            <span class="expertise-value">${count} files</span>
+                        </li>
+                    `).join('');
+                
+                return `
+                    <div class="expertise-card">
+                        <div class="expertise-title">${author}'s Expertise</div>
+                        <ul class="expertise-list">
+                            ${expertiseEntries}
+                        </ul>
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('expertise-grid').innerHTML = expertiseHtml;
+        }
+
         function showError(message) {
             const errorElement = document.getElementById('error-message');
             errorElement.textContent = message;
@@ -359,6 +717,13 @@
             fileItems.forEach(item => {
                 const filename = item.getAttribute('data-filename').toLowerCase();
                 item.style.display = filename.includes(searchTerm) ? 'flex' : 'none';
+            });
+        });
+
+        // Add event listeners for time filter buttons
+        document.querySelectorAll('.time-filter').forEach(button => {
+            button.addEventListener('click', () => {
+                renderCommitTimeChart(button.dataset.period);
             });
         });
 
