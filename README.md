@@ -37,9 +37,9 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 | Provider | Status | Models |
 |----------|--------|---------|
-| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5 |
-| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo |
-| 🟡 **Gemini** | 🚧 Coming Soon |
+| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
+| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
+| 🟢 **Gemini** | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
 | 🟡 **Deepseek** | 🚧 Coming Soon |
 | 🟡 **Llama** | 🚧 Coming Soon |
 

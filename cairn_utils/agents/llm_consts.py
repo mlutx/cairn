@@ -16,6 +16,14 @@ from typing import List, Optional, Dict, Any, Union
 import json
 from pydantic import BaseModel, Field
 
+try:
+    from openai import AsyncOpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+import uuid
+
 
 class ToolCall(BaseModel):
     """
@@ -39,6 +47,7 @@ class ToolResult(BaseModel):
     content: Union[str, List[Any]] = Field(..., description="The result content")
     type: str = Field(..., description="Type identifier for the result")
     id: Optional[str] = Field(None, description="ID of the tool call this result corresponds to")
+    name: Optional[str] = Field(None, description="Name of the tool that was called")
 
 
 class LLMResponseData(BaseModel):
@@ -195,7 +204,7 @@ class AnthropicResponse(LLMResponse):
                         self.tool_calls.append(tool_call)
                     elif block.get("type") == "web_search_tool_result":
                         # Create ToolResult Pydantic model
-                        type =block.get("type", "")
+                        type = block.get("type", "")
                         id = block.get("tool_use_id", "")
                         content_processed = []
                         if type == "web_search_tool_result":
@@ -505,6 +514,16 @@ class ChatAnthropic(ChatLLM):
 
         system_prompt, filtered_messages = self._filter_messages(messages)
 
+        # Filter out 'name' field from tool_result blocks in messages
+        # Anthropic API doesn't accept 'name' in tool_result
+        for message in filtered_messages:
+            if isinstance(message.get("content"), list):
+                for content_block in message["content"]:
+                    if isinstance(content_block, dict) and content_block.get("type") == "tool_result" and "name" in content_block:
+                        # Remove the name field from the tool_result
+                        del content_block["name"]
+                        print(f"\n[DEBUG] Removed 'name' field from tool_result in message for Anthropic API")
+
         # Build API payload
         payload = {
             "model": self.model,
@@ -550,14 +569,6 @@ class ChatAnthropic(ChatLLM):
             payload,
             headers
         )
-
-        # # save response content to the list within the json file called fake_calls.json, which has a single key "fake_calls"
-        # with open("testing/fake_anthropic_calls.json", "r") as f:
-        #     fake_calls = json.load(f)
-        # fake_calls["fake_calls"].append(response_data)
-        # with open("testing/fake_anthropic_calls.json", "w") as f:
-        #     json.dump(fake_calls, f, indent=2, default=str)
-
 
         return AnthropicResponse(response_data.get("content", []), status_code=status_code, raw_logging=self.raw_logging)
 
@@ -756,7 +767,6 @@ class ChatOpenAI(ChatLLM):
                         "name": tool.get("name", ""),
                         "description": tool.get("description", ""),
                         "parameters": tool.get("input_schema", {}),
-                        "strict": False # enforce strict schema.
                     }
                 } for tool in tools
             ]
@@ -792,3 +802,281 @@ class ChatOpenAI(ChatLLM):
         #     json.dump(fake_calls, f, indent=2, default=str)
 
         return OpenAIResponse(response_data, status_code=status_code, raw_logging=self.raw_logging)
+
+
+class GeminiResponse(LLMResponse):
+    """
+    Gemini-specific response wrapper that inherits from LLMResponse.
+
+    Handles parsing of Gemini API responses to extract tool calls, tool results, and text content.
+    """
+
+    def __init__(self, content: Union[Dict[str, Any], List[Dict[str, Any]]], status_code: int = 200, raw_logging: bool = False):
+        """
+        Initialize a Gemini response wrapper.
+
+        Args:
+            content: Raw content from the Gemini API response
+            status_code: HTTP status code of the response
+            raw_logging: Whether to log the parsed response to a file
+        """
+        super().__init__(content, status_code, raw_logging)
+
+    def _process_content(self):
+        """
+        Process Gemini response to extract tool calls and text content.
+
+        Gemini returns responses with 'candidates' array, where each candidate has 'content' with:
+        - 'parts': The text response parts
+        - 'functionCall': Function call objects (when tools are used)
+        - 'functionResponse': Function response objects (when responding to tool calls)
+        """
+        # Handle string-only content directly
+        if isinstance(self.content, str):
+            self.text_content = self.content
+            return
+
+        # Get the first candidate from the response
+        if isinstance(self.content, dict) and 'candidates' in self.content:
+            candidate = self.content['candidates'][0]
+            content = candidate.get('content', {})
+
+            # Extract text content from parts
+            parts = content.get('parts', [])
+            text_parts = []
+            for part in parts:
+                if 'text' in part:
+                    text_parts.append(part['text'])
+                if 'functionCall' in part:
+                    function_name = part['functionCall']['name']
+                    args = part['functionCall']['args']
+
+                    # Generate a random id for the tool call
+                    id = str(uuid.uuid4())
+
+                    self.tool_calls.append(
+                        ToolCall(
+                            id=id,
+                            name=function_name,
+                            input=args,
+                            type="tool_use",
+                            server_executed=False
+                        )
+                    )
+                if 'functionResponse' in part:
+                    # Extract function response data if present
+                    function_name = part['functionResponse']['name']
+                    response_data = part['functionResponse']['response']
+
+                    # Generate an ID for the tool result if not present
+                    id = str(uuid.uuid4())
+
+                    # Create a ToolResult
+                    self.tool_results[id] = ToolResult(
+                        content=response_data.get('content', ''),
+                        type="tool_result",
+                        id=id,
+                        name=function_name
+                    )
+
+            self.text_content = "".join(text_parts)
+
+
+
+class ChatGemini(ChatLLM):
+    """Gemini API client with tool calling support."""
+
+    def __init__(self, model: str, api_key: Optional[str] = None, raw_logging: bool = False):
+        """
+        Initialize a Gemini API client.
+
+        Args:
+            model: The Gemini model to use (e.g., 'gemini-1.5-pro')
+            api_key: Optional API key. If not provided, will try to get it from environment
+            raw_logging: Whether to log API calls and responses to files
+        """
+        # Get API key from environment if not provided
+        if not api_key:
+            api_key = os.environ.get("GEMINI_API_KEY")
+
+        super().__init__(model, api_key, raw_logging)
+
+    async def ainvoke(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        server_tools: Optional[Dict[str, Dict[str, Any]]] = None,
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
+        **kwargs,
+    ) -> GeminiResponse:
+        """
+        Invoke the Gemini model with messages and optional tool calling support.
+
+        Args:
+            messages: The messages to send to the model (can include system messages)
+            tools: List of client-side tools in Gemini format
+            server_tools: Dictionary of server-side tools (not directly supported by Gemini)
+            tool_choice: Tool choice configuration (not directly supported by Gemini)
+            **kwargs: Additional kwargs to pass to the model
+
+        Returns:
+            GeminiResponse with the model's response and status code
+        """
+        print(f'\n[DEBUG] ChatGemini.ainvoke() called with model: {self.model}')
+
+        system_prompt, filtered_messages = self._filter_messages(messages)
+
+        # Convert messages to Gemini format
+        gemini_messages = []
+
+        # Process other messages
+        for message in filtered_messages:
+            role = message["role"]
+            content = message["content"]
+
+            # Map roles to Gemini format (Gemini uses "user" and "model")
+            gemini_role = "user" if role == "user" else "model"
+
+            # Handle string content directly
+            if isinstance(content, str):
+                gemini_messages.append({
+                    "role": gemini_role,
+                    "parts": [{"text": content}]
+                })
+                continue
+
+            # Handle list content (tool results, etc)
+            if isinstance(content, list):
+                parts = []
+                for block in content:
+                    if block["type"] == "text":
+                        parts.append({"text": block["text"]})
+                    elif block["type"] == "tool_use" and gemini_role == "model":
+                        # Format tool calls for Gemini as proper functionCall
+                        function_call = {
+                            "name": block.get("name", ""),
+                            "args": block.get("input", {})
+                        }
+                        parts.append({"functionCall": function_call})
+                    elif block["type"] == "tool_result" and gemini_role == "user":
+                        print(f'-'*1000)
+                        print(f'RAW TOOL_RESULT BLOCK: {block}')
+                        # Format tool results for Gemini as proper functionResponse
+                        # This matches the Gemini API expectation for function responses
+                        function_name = block.get("name", "")
+                        # Format the response properly according to Gemini API expectations
+                        function_response = {
+                            "name": function_name,
+                            "response": {
+                                "content": block.get("content", ""),
+                                "isError": False
+                            }
+                        }
+                        parts.append({"functionResponse": function_response})
+
+                gemini_messages.append({
+                    "role": gemini_role,
+                    "parts": parts
+                })
+
+        # Build API payload
+        payload = {
+            "contents": gemini_messages,
+        }
+
+        # Add system instruction if present
+        if system_prompt:
+            payload["system_instruction"] = {
+                "parts": [{"text": system_prompt}]
+            }
+
+        # Format tools for Gemini
+        if tools:
+            payload["tools"] = []
+            for tool in tools:
+                # Clean up the schema for Gemini - it has stricter requirements
+                # than other LLMs for JSON Schema validation
+                parameters = tool.get("input_schema", {}).copy()
+
+                # Define a function to clean up schema recursively
+                def clean_schema_for_gemini(schema):
+                    if not isinstance(schema, dict):
+                        return schema
+
+                    # Check for exclusive fields
+                    exclusive_fields = ["anyOf", "any_of", "oneOf", "allOf", "not"]
+                    found_exclusive = None
+                    for field in exclusive_fields:
+                        if field in schema:
+                            found_exclusive = field
+                            break
+
+                    # If we found an exclusive field, only keep that field
+                    if found_exclusive:
+                        exclusive_value = schema[found_exclusive]
+                        # Clean up the items in the exclusive field
+                        if isinstance(exclusive_value, list):
+                            exclusive_value = [clean_schema_for_gemini(item) for item in exclusive_value]
+                        return {found_exclusive: exclusive_value}
+
+                    # Process regular schema
+                    result = {}
+                    for key, value in schema.items():
+                        if key == "properties" and isinstance(value, dict):
+                            # Process each property
+                            cleaned_props = {}
+                            for prop_name, prop_schema in value.items():
+                                cleaned_props[prop_name] = clean_schema_for_gemini(prop_schema)
+                            result[key] = cleaned_props
+                        elif key == "items" and isinstance(value, dict):
+                            # Process array items
+                            result[key] = clean_schema_for_gemini(value)
+                        elif isinstance(value, dict):
+                            # Process nested objects
+                            result[key] = clean_schema_for_gemini(value)
+                        elif isinstance(value, list) and key not in ["required", "enum"]:
+                            # Process lists (except for required and enum fields)
+                            result[key] = [clean_schema_for_gemini(item) if isinstance(item, dict) else item for item in value]
+                        else:
+                            # Keep other values as is
+                            result[key] = value
+
+                    return result
+
+                # Apply the cleanup to the parameters
+                parameters = clean_schema_for_gemini(parameters)
+
+                # # Debug logging for schema cleaning
+                # if self.raw_logging:
+                #     print(f"\n[DEBUG] Original schema for tool '{tool.get('name', '')}': {json.dumps(tool.get('input_schema', {}), indent=2)}")
+                #     print(f"\n[DEBUG] Cleaned schema for tool '{tool.get('name', '')}': {json.dumps(parameters, indent=2)}")
+
+                gemini_tool = {
+                    "functionDeclarations": [{
+                        "name": tool.get("name", ""),
+                        "description": tool.get("description", ""),
+                        "parameters": parameters
+                    }]
+                }
+                payload["tools"].append(gemini_tool)
+
+        # Make API call
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": self.api_key
+        }
+
+        # Log the API payload if raw_logging is enabled
+        if self.raw_logging:
+            self._log_api_payload(payload)
+
+        # Make the API request and wrap the response
+        response_data, status_code = await self._make_api_request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent",
+            payload,
+            headers
+        )
+
+        print(f'raw response data: {response_data}')
+
+        return GeminiResponse(response_data, status_code=status_code, raw_logging=self.raw_logging)
