@@ -49,21 +49,63 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: background-color 0.2s ease;
+        }
+
+        .repo-item:hover {
+            background-color: #21262d;
         }
 
         .repo-item:last-child {
             border-bottom: none;
         }
 
+        .repo-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            flex: 1;
+            margin-right: 15px;
+        }
+
+        .repo-link:hover .repo-name {
+            color: #79c0ff;
+        }
+
+        .repo-link:hover .repo-description {
+            color: #c9d1d9;
+        }
+
+        .repo-info {
+            flex: 1;
+        }
+
         .repo-name {
             font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
             color: #58a6ff;
-            text-decoration: none;
-            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            transition: color 0.2s ease;
         }
 
-        .repo-name:hover {
-            text-decoration: underline;
+        .repo-description {
+            color: #8b949e;
+            font-size: 14px;
+            margin: 0;
+            transition: color 0.2s ease;
+        }
+
+        .analytics-icon {
+            width: 20px;
+            height: 20px;
+            margin-left: 10px;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+
+        .repo-link:hover .analytics-icon {
+            opacity: 1;
         }
 
         .delete-btn {
@@ -74,6 +116,7 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 12px;
+            transition: all 0.2s ease;
         }
 
         .delete-btn:hover {
@@ -146,6 +189,22 @@
             color: #ffffff;
             border: 1px solid #f85149;
         }
+
+        .section-header {
+            margin-bottom: 15px;
+        }
+
+        .section-title {
+            color: #f0f6fc;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .section-description {
+            color: #8b949e;
+            font-size: 14px;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -154,6 +213,11 @@
         <h1>Repository Management</h1>
         
         <div id="alert" class="alert"></div>
+        
+        <div class="section-header">
+            <h2 class="section-title">Connected Repositories</h2>
+            <p class="section-description">Click on any repository to view detailed analytics including contributors, file ownership, commit patterns, and team expertise.</p>
+        </div>
         
         <div class="repo-list" id="repoList">
             <!-- Repositories will be loaded here -->
@@ -193,9 +257,32 @@
                 const data = await response.json();
                 
                 const repoList = document.getElementById('repoList');
+                
+                if (data.repos.length === 0) {
+                    repoList.innerHTML = `
+                        <div style="padding: 40px; text-align: center; color: #8b949e;">
+                            <svg style="width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5;" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M7,9.5C7,8.7 7.7,8 8.5,8C9.3,8 10,8.7 10,9.5C10,10.3 9.3,11 8.5,11C7.7,11 7,10.3 7,9.5M14,17.5H10V16.5C10,15.1 11.1,14 12.5,14C13.9,14 15,15.1 15,16.5V17.5H14M14,9.5C14,8.7 14.7,8 15.5,8C16.3,8 17,8.7 17,9.5C17,10.3 16.3,11 15.5,11C14.7,11 14,10.3 14,9.5Z"/>
+                            </svg>
+                            <h3 style="margin: 0 0 8px 0; color: #c9d1d9;">No repositories connected</h3>
+                            <p style="margin: 0;">Add a repository below to start viewing analytics and insights.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
                 repoList.innerHTML = data.repos.map(repo => `
                     <div class="repo-item">
-                        <a href="/repos/${repo.owner}/${repo.repo}" class="repo-name">${repo.owner}/${repo.repo}</a>
+                        <a href="/repos/${repo.owner}/${repo.repo}" class="repo-link">
+                            <div class="repo-info">
+                                <div class="repo-name">${repo.owner}/${repo.repo}</div>
+                                <div class="repo-description">View analytics • Contributors • File ownership • Commit patterns • Team expertise</div>
+                            </div>
+                            <svg class="analytics-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M3 3v18h18v-2H5V3H3zm18 16l-7-8-4 4-4-4v10h15z" opacity="0.7"/>
+                                <path d="M7 14l4-4 4 4 7-8v2l-7 8-4-4-4 4z" fill="#58a6ff"/>
+                            </svg>
+                        </a>
                         <button class="delete-btn" onclick="deleteRepo('${repo.owner}', '${repo.repo}')">Delete</button>
                     </div>
                 `).join('');

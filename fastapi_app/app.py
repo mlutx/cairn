@@ -1142,7 +1142,26 @@ async def get_repo_stats(owner: str, repo: str):
                     if filename not in file_ownership:
                         file_ownership[filename] = {"authors": {}, "last_modified": None}
                     
-                    file_ownership[filename]["authors"][display_author] = file_ownership[filename]["authors"].get(display_author, 0) + 1
+                    # Calculate lines changed (additions + deletions) for this file in this commit
+                    additions = file.get("additions", 0)
+                    deletions = file.get("deletions", 0)
+                    lines_changed = additions + deletions
+                    
+                    # Initialize author data structure if needed
+                    if display_author not in file_ownership[filename]["authors"]:
+                        file_ownership[filename]["authors"][display_author] = {
+                            "commits": 0,
+                            "lines_changed": 0,
+                            "additions": 0,
+                            "deletions": 0
+                        }
+                    
+                    # Update author statistics
+                    file_ownership[filename]["authors"][display_author]["commits"] += 1
+                    file_ownership[filename]["authors"][display_author]["lines_changed"] += lines_changed
+                    file_ownership[filename]["authors"][display_author]["additions"] += additions
+                    file_ownership[filename]["authors"][display_author]["deletions"] += deletions
+                    
                     if not file_ownership[filename]["last_modified"]:
                         file_ownership[filename]["last_modified"] = commit_data["commit"]["author"]["date"]
                 

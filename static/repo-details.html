@@ -458,20 +458,50 @@
             const filesHtml = Object.entries(fileOwnership)
                 .sort((a, b) => b[1].last_modified.localeCompare(a[1].last_modified))
                 .map(([filename, data]) => {
+                    // Handle both old and new data structure
                     const authors = Object.entries(data.authors)
-                        .sort((a, b) => b[1] - a[1]);
+                        .map(([author, authorData]) => {
+                            // If authorData is a number (old structure), convert to new structure
+                            if (typeof authorData === 'number') {
+                                return [author, { commits: authorData, lines_changed: authorData }];
+                            }
+                            // New structure with detailed metrics
+                            return [author, authorData];
+                        })
+                        // Sort by lines changed primarily, then by commits as tiebreaker
+                        .sort((a, b) => {
+                            const linesA = a[1].lines_changed || 0;
+                            const linesB = b[1].lines_changed || 0;
+                            if (linesA !== linesB) {
+                                return linesB - linesA; // Sort by lines changed descending
+                            }
+                            return (b[1].commits || 0) - (a[1].commits || 0); // Tiebreaker: commits descending
+                        });
                     
                     const primaryAuthor = authors[0];
                     const otherAuthors = authors.slice(1);
+
+                    // Format display for primary author
+                    const primaryStats = primaryAuthor[1];
+                    const primaryLines = primaryStats.lines_changed || 0;
+                    const primaryCommits = primaryStats.commits || 0;
+                    const primaryDisplay = primaryLines > 0 
+                        ? `${primaryAuthor[0]} (${primaryLines} lines, ${primaryCommits} commits)`
+                        : `${primaryAuthor[0]} (${primaryCommits} commits)`;
 
                     return `
                         <div class="file-item" data-filename="${filename}">
                             <span class="file-name">${filename}</span>
                             <div class="file-owners">
-                                <span class="owner-tag primary">${primaryAuthor[0]} (${primaryAuthor[1]} commits)</span>
-                                ${otherAuthors.map(([author, commits]) => 
-                                    `<span class="owner-tag">${author} (${commits})</span>`
-                                ).join('')}
+                                <span class="owner-tag primary">${primaryDisplay}</span>
+                                ${otherAuthors.map(([author, stats]) => {
+                                    const lines = stats.lines_changed || 0;
+                                    const commits = stats.commits || 0;
+                                    const display = lines > 0 
+                                        ? `${author} (${lines} lines, ${commits} commits)`
+                                        : `${author} (${commits} commits)`;
+                                    return `<span class="owner-tag">${display}</span>`;
+                                }).join('')}
                             </div>
                         </div>
                     `;
@@ -692,8 +722,26 @@
                     }
                 }
 
+                // Sort authors by lines changed (new structure) or commits (old structure)
+                const sortedAuthors = authors
+                    .map(([author, authorData]) => {
+                        // Handle both old and new data structure
+                        if (typeof authorData === 'number') {
+                            return [author, { commits: authorData, lines_changed: authorData }];
+                        }
+                        return [author, authorData];
+                    })
+                    .sort((a, b) => {
+                        const linesA = a[1].lines_changed || 0;
+                        const linesB = b[1].lines_changed || 0;
+                        if (linesA !== linesB) {
+                            return linesB - linesA;
+                        }
+                        return (b[1].commits || 0) - (a[1].commits || 0);
+                    });
+
                 // Assign file to primary author's expertise
-                const primaryAuthor = authors[0][0];
+                const primaryAuthor = sortedAuthors[0][0];
                 if (!contributorExpertise[primaryAuthor]) {
                     contributorExpertise[primaryAuthor] = {};
                 }
