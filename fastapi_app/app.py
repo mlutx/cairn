@@ -1047,6 +1047,35 @@ async def get_repo_stats(owner: str, repo: str):
             }
             commit_authors = {}
 
+            # Create a mapping of Git author names to GitHub usernames
+            author_mapping = {}
+            
+            def normalize_author_name(git_name, github_login, email=None):
+                """Normalize author names to prefer GitHub usernames"""
+                if github_login:
+                    return github_login
+                
+                # Apply heuristics for common name variations
+                if git_name:
+                    # Convert to lowercase for comparison
+                    name_lower = git_name.lower()
+                    
+                    # Common patterns: "First Last" -> try to match with GitHub usernames
+                    # For now, just use the Git name but we could add more sophisticated matching
+                    return git_name
+                
+                return git_name or "Unknown"
+            
+            # First pass: build author mapping from contributors API and commit data
+            contributor_logins = {contributor["login"].lower(): contributor["login"] for contributor in contributors}
+            
+            # Common author name mappings (you can add more as needed)
+            manual_mappings = {
+                "Benjamin Rich": "brrich",
+                "benjamin rich": "brrich", 
+                # Add more mappings as needed
+            }
+
             for commit in commits:
                 commit_sha = commit["sha"]
                 commit_details = await client.get(
@@ -1056,14 +1085,64 @@ async def get_repo_stats(owner: str, repo: str):
                 commit_details.raise_for_status()
                 commit_data = commit_details.json()
                 
+                # Get author info
+                git_author_name = commit_data["commit"]["author"]["name"]
+                git_author_email = commit_data["commit"]["author"].get("email", "")
+                github_author = None
+                
+                # Try to get GitHub username from commit data
+                if "author" in commit_data and commit_data["author"]:
+                    github_author = commit_data["author"]["login"]
+                elif "committer" in commit_data and commit_data["committer"]:
+                    github_author = commit_data["committer"]["login"]
+                
+                # Determine the display author using multiple strategies
+                display_author = git_author_name
+                
+                # Strategy 1: Use GitHub username if available
+                if github_author:
+                    display_author = github_author
+                # Strategy 2: Check manual mappings
+                elif git_author_name in manual_mappings:
+                    display_author = manual_mappings[git_author_name]
+                # Strategy 3: Try to match Git name with contributor logins (case-insensitive)
+                elif git_author_name and git_author_name.lower().replace(" ", "") in contributor_logins:
+                    display_author = contributor_logins[git_author_name.lower().replace(" ", "")]
+                # Strategy 4: Look for similar usernames (first part of name)
+                elif git_author_name:
+                    first_name = git_author_name.split()[0].lower() if git_author_name.split() else ""
+                    for login in contributor_logins.values():
+                        if first_name and (first_name in login.lower() or login.lower() in first_name):
+                            display_author = login
+                            break
+                
+                # Build mapping
+                author_mapping[git_author_name] = display_author
+                logger.info(f"Mapped Git author '{git_author_name}' to display author '{display_author}'")
+            
+            logger.info(f"Final author mapping: {author_mapping}")
+
+            # Second pass: process commits using the mapping
+            for commit in commits:
+                commit_sha = commit["sha"]
+                commit_details = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/commits/{commit_sha}",
+                    headers=headers
+                )
+                commit_details.raise_for_status()
+                commit_data = commit_details.json()
+                
+                # Get the Git author name and map it to display author
+                git_author_name = commit_data["commit"]["author"]["name"]
+                display_author = author_mapping.get(git_author_name, git_author_name)
+                
                 # Process file ownership
                 for file in commit_data.get("files", []):
                     filename = file["filename"]
-                    author = commit_data["commit"]["author"]["name"]
                     if filename not in file_ownership:
                         file_ownership[filename] = {"authors": {}, "last_modified": None}
                     
-                    file_ownership[filename]["authors"][author] = file_ownership[filename]["authors"].get(author, 0) + 1
+                    file_ownership[filename]["authors"][display_author] = file_ownership[filename]["authors"].get(display_author, 0) + 1
                     if not file_ownership[filename]["last_modified"]:
                         file_ownership[filename]["last_modified"] = commit_data["commit"]["author"]["date"]
                 
@@ -1087,17 +1166,16 @@ async def get_repo_stats(owner: str, repo: str):
                             month = dt.month - 1
                             commit_times['month'][month] += 1
                             
-                            # Track author commits
-                            author = commit_data["commit"]["author"]["name"]
-                            if author not in commit_authors:
-                                commit_authors[author] = {
+                            # Track author commits using display_author
+                            if display_author not in commit_authors:
+                                commit_authors[display_author] = {
                                     'total': 0,
                                     'hours': [0] * 24,
                                     'days': [0] * 7
                                 }
-                            commit_authors[author]['total'] += 1
-                            commit_authors[author]['hours'][hour] += 1
-                            commit_authors[author]['days'][day] += 1
+                            commit_authors[display_author]['total'] += 1
+                            commit_authors[display_author]['hours'][hour] += 1
+                            commit_authors[display_author]['days'][day] += 1
                         except Exception as e:
                             logger.error(f"Error parsing commit date: {e}")
 
