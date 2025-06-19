@@ -330,7 +330,7 @@
             </div>
 
             <!-- Commit Activity Visualization -->
-            <div class="stat-card">
+            <div class="stat-card" id="commit-activity-section">
                 <h2>Commit Activity</h2>
                 <div class="commit-time-filters">
                     <button class="time-filter active" data-period="day">Time of Day</button>
@@ -481,6 +481,24 @@
         }
 
         function renderCommitTimeChart(period) {
+            // Check if we have real commit data
+            if (!repoData || !repoData.commit_times) {
+                document.getElementById('commit-activity-section').style.display = 'none';
+                return;
+            }
+
+            const commitTimes = repoData.commit_times;
+            
+            // Check if there's any real data (non-zero values)
+            const hasHourData = commitTimes.hour_of_day && commitTimes.hour_of_day.some(count => count > 0);
+            const hasDayData = commitTimes.day_of_week && commitTimes.day_of_week.some(count => count > 0);
+            const hasMonthData = commitTimes.month && commitTimes.month.some(count => count > 0);
+            
+            if (!hasHourData && !hasDayData && !hasMonthData) {
+                document.getElementById('commit-activity-section').style.display = 'none';
+                return;
+            }
+
             // Clear previous chart if it exists
             if (commitTimeChart) {
                 commitTimeChart.destroy();
@@ -491,40 +509,40 @@
                 btn.classList.toggle('active', btn.dataset.period === period);
             });
 
-            // Prepare data based on period
+            // Prepare data based on period using real data
             let labels = [];
             let data = [];
 
-            if (period === 'day') {
+            if (period === 'day' && hasHourData) {
                 // Hours of the day (0-23)
                 labels = Array.from({ length: 24 }, (_, i) => `${i}:00`);
-                data = Array(24).fill(0);
-
-                // Mock data for demonstration
-                // In a real implementation, this would use actual commit timestamps
-                for (let i = 0; i < 200; i++) {
-                    const hour = Math.floor(Math.random() * 24);
-                    data[hour]++;
-                }
-            } else if (period === 'week') {
+                data = commitTimes.hour_of_day;
+            } else if (period === 'week' && hasDayData) {
                 // Days of the week
                 labels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                data = Array(7).fill(0);
-
-                // Mock data for demonstration
-                for (let i = 0; i < 200; i++) {
-                    const day = Math.floor(Math.random() * 7);
-                    data[day]++;
-                }
-            } else if (period === 'month') {
+                data = commitTimes.day_of_week;
+            } else if (period === 'month' && hasMonthData) {
                 // Months of the year
                 labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                data = Array(12).fill(0);
-
-                // Mock data for demonstration
-                for (let i = 0; i < 200; i++) {
-                    const month = Math.floor(Math.random() * 12);
-                    data[month]++;
+                data = commitTimes.month;
+            } else {
+                // If selected period has no data, try to find one that does
+                if (hasHourData) {
+                    period = 'day';
+                    labels = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+                    data = commitTimes.hour_of_day;
+                } else if (hasDayData) {
+                    period = 'week';
+                    labels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                    data = commitTimes.day_of_week;
+                } else if (hasMonthData) {
+                    period = 'month';
+                    labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    data = commitTimes.month;
+                } else {
+                    // No data available
+                    document.getElementById('commit-activity-section').style.display = 'none';
+                    return;
                 }
             }
 
