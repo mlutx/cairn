@@ -995,15 +995,15 @@ async def get_repo_stats(owner: str, repo: str):
     if not worker_manager:
         raise HTTPException(status_code=503, detail="WorkerManager not initialized")
     
+    # Get GitHub token from environment
+    github_token = os.getenv("GITHUB_TOKEN")
+    if not github_token:
+        raise HTTPException(
+            status_code=400,
+            detail="GITHUB_TOKEN_MISSING"
+        )
+    
     try:
-        # Get GitHub token from environment
-        github_token = os.getenv("GITHUB_TOKEN")
-        if not github_token:
-            raise HTTPException(
-                status_code=500,
-                detail="GitHub token not configured. Please set the GITHUB_TOKEN environment variable."
-            )
-
         # Fetch repository data using GitHub API
         headers = {
             "Authorization": f"token {github_token}",

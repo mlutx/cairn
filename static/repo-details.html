@@ -399,6 +399,13 @@
             try {
                 const response = await fetch(`/api/repos/${owner}/${repo}/stats`);
                 if (!response.ok) {
+                    if (response.status === 400) {
+                        const errorData = await response.text();
+                        if (errorData.includes('GITHUB_TOKEN_MISSING')) {
+                            showGitHubTokenInstructions();
+                            return;
+                        }
+                    }
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 repoData = await response.json();
@@ -707,6 +714,49 @@
             errorElement.textContent = message;
             errorElement.style.display = 'block';
             document.getElementById('loading').style.display = 'none';
+        }
+
+        function showGitHubTokenInstructions() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error-message').innerHTML = `
+                <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 20px; margin: 20px 0;">
+                    <h3 style="color: #f85149; margin-top: 0;">GitHub Token Required for Repository Analytics</h3>
+                    <p>To view repository statistics, you need to configure a GitHub Personal Access Token. This is optional and only required for analytics features.</p>
+                    
+                    <h4 style="color: #58a6ff; margin-top: 20px;">Setup Instructions:</h4>
+                    
+                    <ol style="line-height: 1.6;">
+                        <li><strong>Generate a Personal Access Token:</strong>
+                            <ul style="margin: 10px 0;">
+                                <li>Go to <a href="https://github.com/settings/tokens" target="_blank" style="color: #58a6ff;">GitHub Settings → Tokens</a></li>
+                                <li>Click "Generate new token (classic)"</li>
+                                <li>Select appropriate scopes:
+                                    <ul style="margin: 5px 0;">
+                                        <li>For <strong>public repositories</strong>: <code style="background-color: #21262d; padding: 2px 4px; border-radius: 3px;">public_repo</code></li>
+                                        <li>For <strong>private repositories</strong>: <code style="background-color: #21262d; padding: 2px 4px; border-radius: 3px;">repo</code></li>
+                                    </ul>
+                                </li>
+                                <li>Copy the generated token</li>
+                            </ul>
+                        </li>
+                        
+                        <li><strong>Add to your .env file:</strong>
+                            <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; margin: 10px 0; font-family: 'Courier New', monospace;">
+                                <code style="color: #c9d1d9;">GITHUB_TOKEN=your_github_token_here</code>
+                            </div>
+                        </li>
+                        
+                        <li><strong>Restart the Cairn application</strong> for the changes to take effect</li>
+                    </ol>
+                    
+                    <div style="background-color: #0d1117; border-left: 3px solid #f85149; padding: 10px; margin: 20px 0;">
+                        <strong>Note:</strong> The analytics feature is optional. Core agent functionality works without the GitHub token.
+                    </div>
+                    
+                    <p>For more details, see the <a href="https://github.com/cairn-dev/cairn#repository-analytics-optional" target="_blank" style="color: #58a6ff;">Repository Analytics section</a> in the README.</p>
+                </div>
+            `;
+            document.getElementById('error-message').style.display = 'block';
         }
 
         // File search functionality
