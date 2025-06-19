@@ -62,9 +62,8 @@ def create_tool_result_message(
         "is_error": is_error,
     }
 
-    # Add name if provided
-    if name:
-        tool_result["name"] = name
+    # We don't include name for Anthropic as it causes API errors
+    # Anthropic API doesn't accept name in tool_result
 
     return {
         "role": "user",

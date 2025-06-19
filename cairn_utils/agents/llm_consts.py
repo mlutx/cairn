@@ -206,7 +206,6 @@ class AnthropicResponse(LLMResponse):
                         # Create ToolResult Pydantic model
                         type = block.get("type", "")
                         id = block.get("tool_use_id", "")
-                        name = block.get("name", "web_search")  # Get name or default to "web_search"
                         content_processed = []
                         if type == "web_search_tool_result":
                             content = block.get("content", {})
@@ -220,8 +219,7 @@ class AnthropicResponse(LLMResponse):
                         tool_result = ToolResult(
                             content=content_processed,
                             type=type,
-                            id=id,
-                            name=name
+                            id=id
                         )
                         self.tool_results[block.get("id", "")] = tool_result
 
@@ -516,6 +514,16 @@ class ChatAnthropic(ChatLLM):
 
         system_prompt, filtered_messages = self._filter_messages(messages)
 
+        # Filter out 'name' field from tool_result blocks in messages
+        # Anthropic API doesn't accept 'name' in tool_result
+        for message in filtered_messages:
+            if isinstance(message.get("content"), list):
+                for content_block in message["content"]:
+                    if isinstance(content_block, dict) and content_block.get("type") == "tool_result" and "name" in content_block:
+                        # Remove the name field from the tool_result
+                        del content_block["name"]
+                        print(f"\n[DEBUG] Removed 'name' field from tool_result in message for Anthropic API")
+
         # Build API payload
         payload = {
             "model": self.model,
@@ -561,14 +569,6 @@ class ChatAnthropic(ChatLLM):
             payload,
             headers
         )
-
-        # # save response content to the list within the json file called fake_calls.json, which has a single key "fake_calls"
-        # with open("testing/fake_anthropic_calls.json", "r") as f:
-        #     fake_calls = json.load(f)
-        # fake_calls["fake_calls"].append(response_data)
-        # with open("testing/fake_anthropic_calls.json", "w") as f:
-        #     json.dump(fake_calls, f, indent=2, default=str)
-
 
         return AnthropicResponse(response_data.get("content", []), status_code=status_code, raw_logging=self.raw_logging)
 

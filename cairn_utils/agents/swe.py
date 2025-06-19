@@ -286,8 +286,8 @@ async def main(owner: str = "cairn-dev", repos: List[str] = ["test"]):
         live_logging=True,
         run_id=run_id,
         # subtask_id="970f06f8-03de-4e76-9386-6feed924358c",
-        model_provider="gemini",
-        model_name="gemini-2.0-flash",
+        model_provider="openai",
+        model_name="gpt-4.1",
         running_locally=True,
         # other_agents = [{
         #     "run_id": "test_run_SEE_OTHER_AGENTS2",
