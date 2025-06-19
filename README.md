@@ -149,9 +149,10 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    GITHUB_INSTALLATION_ID=your_installation_id_here
    GITHUB_PRIVATE_KEY_PATH=your_private_key_file.pem
 
-   # Anthropic API key (REQUIRED) - Get from https://console.anthropic.com/
+   # LLM API keys. Each is optional, add the ones you want to use.
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
    OPENAI_API_KEY=your_openai_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
 
    # Connected repositories - Format: "owner/repo-name,owner/repo-name" (comma-separated, no spaces)
    # Examples:
