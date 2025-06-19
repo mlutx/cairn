@@ -9,6 +9,7 @@ import asyncio
 import os
 import sys
 import time
+import json
 from typing import Any, Dict, List
 
 from dotenv import load_dotenv
@@ -28,6 +29,7 @@ from langgraph_utils import (
 )
 from llm_consts import ChatAnthropic
 from thought_logger import AgentLogger
+from supported_models import find_supported_model_given_model_name, SUPPORTED_MODELS
 
 
 class ExplorerAgent:
@@ -48,13 +50,15 @@ class ExplorerAgent:
         owner: str,
         repos: list[str],
         installation_id: int,
+        model_provider: str,
+        model_name: str,
         branch: str = None,
-        model_name: str = "claude-3-7-sonnet-latest",
         llm_client=None,
         live_logging=False,
         run_id=None,
         running_locally=False,
         subtask_id=None,
+        fake_calls_path: str = None
     ):
         """
         Set up the agent with necessary components.
@@ -67,10 +71,10 @@ class ExplorerAgent:
             model_name (str): LLM model name
             llm_client: LLM client to use. If None, creates new one.
             live_logging (bool): Whether to print live logs
-            supabase_client: Supabase client for logging
             run_id (str): Run ID for logging
             running_locally (bool): Whether running locally
             subtask_id (str): Subtask ID for logging
+            fake_calls_path (str): Path to JSON file containing fake LLM responses for testing
 
         Returns:
             ExplorerAgent: The configured agent instance
@@ -80,11 +84,13 @@ class ExplorerAgent:
         self.run_id = run_id or str(int(time.time()))
         self.running_locally = running_locally
         self.subtask_id = subtask_id
+        self.model_provider = model_provider
+        self.model_name = model_name
 
         # Setup clients and dependencies
         await self._setup_clients()
         await self._setup_toolbox(owner, repos, installation_id, branch)
-        self._setup_llm_and_logger(llm_client, model_name)
+        self._setup_llm_and_logger(llm_client, model_name, fake_calls_path)
         await self._setup_graph(repos)
 
         return self
@@ -99,12 +105,34 @@ class ExplorerAgent:
         )
         await self.toolbox.authenticate()
 
-    def _setup_llm_and_logger(self, llm_client, model_name):
+    def _setup_llm_and_logger(self, llm_client, model_name, fake_calls_path=None):
         """Setup LLM client and logger."""
         self.llm_client = llm_client or ChatAnthropic(model=model_name)
         self.logger = AgentLogger(
             run_id=self.run_id,
         )
+
+        # find the correct chat client
+        chat_info = SUPPORTED_MODELS[self.model_provider]
+        if not self.model_name in chat_info['models']:
+            print('-'*50)
+            print(f'[DEBUG] Model {self.model_name} not found in {self.model_provider} models. May not be supported!')
+            print('-'*50)
+
+        chat_client = chat_info['chat_class']
+        self.llm_client = chat_client(model=model_name)
+
+        # Load fake responses if path is provided
+        if fake_calls_path and os.path.exists(fake_calls_path):
+            try:
+                with open(fake_calls_path, "r") as f:
+                    fake_calls = json.load(f)
+                for fake_call in fake_calls.get("fake_calls", []):
+                    self.llm_client.add_fake_response(fake_call)
+                if self.live_logging:
+                    print(f"Loaded fake responses from {fake_calls_path}")
+            except Exception as e:
+                raise RuntimeError(f"Failed to load fake responses from {fake_calls_path}. This is a fatal error as test responses are required: {str(e)}")
 
     async def _setup_graph(self, repos):
         """Create and configure the agent graph."""

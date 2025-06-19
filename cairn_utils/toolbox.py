@@ -64,6 +64,7 @@ from tool_related_prompts import (
     REPO_MEMORY_PROMPT_NO_MEM,
     REPO_MEMORY_PROMPT_HAS_MEM,
 )
+from supported_models import SUPPORTED_MODELS, find_supported_model_given_model_name
 
 class DefaultToolBox:
     """
@@ -110,6 +111,17 @@ class DefaultToolBox:
         self._load_cairn_settings()
         self.repo_memory = {}
         self._load_cairn_repo_memory()
+
+    def _get_cairn_dir(self) -> str:
+        """
+        Get the path to the .cairn directory, which should be one level up from where toolbox.py is located.
+        """
+        # Get the directory where toolbox.py is located
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Go one directory up to get to the parent directory
+        parent_dir = os.path.dirname(current_dir)
+        # Return the path to .cairn in the parent directory
+        return os.path.join(parent_dir, ".cairn")
 
     async def authenticate(self):
         self.jwt_token = generate_jwt()
@@ -646,7 +658,11 @@ class DefaultToolBox:
                     original_content = ""
                     # print(f"File '{file_path}' doesn't exist, creating new file with blank content")
 
-                llm_client = ChatAnthropic(model=self.model_name)
+                # find associated LLM client given model name...
+                provider, model_info = find_supported_model_given_model_name(self.model_name)
+                chat_class = model_info['chat_class']
+
+                llm_client = chat_class(model=self.model_name)
 
                 # Format the user message with the original content and edit suggestions
                 user_message = EDIT_FILE_USER_MESSAGE.format(
@@ -660,7 +676,7 @@ class DefaultToolBox:
                 ]
 
                 # Make the LLM call
-                response = await llm_client.ainvoke(messages)
+                response = await llm_client.ainvoke(messages, use_predictive_output=True, predictive_content=edit_suggestions)
 
                 # Extract the response content
                 if isinstance(response.content, str):
@@ -1099,8 +1115,8 @@ class DefaultToolBox:
             self.settings = None
             return
 
-        # Use current working directory
-        cairn_dir = ".cairn"
+        # Use the correct .cairn directory path
+        cairn_dir = self._get_cairn_dir()
         settings_file = os.path.join(cairn_dir, "settings.json")
 
         print(f"settings file: {settings_file}")
@@ -1157,7 +1173,8 @@ class DefaultToolBox:
         self.repo_memory[self.repo] = repo_memory
 
         # write the updated repo memory to the file
-        with open(os.path.join(".cairn", "memory", f"{self.repo}.json"), "w") as f:
+        memory_file = os.path.join(self._get_cairn_dir(), "memory", f"{self.repo}.json")
+        with open(memory_file, "w") as f:
             json.dump({"memory": repo_memory}, f, indent=4)
 
         print(f"[DEBUG] updated repo memory for {self.repo} to: {repo_memory}")
@@ -1193,7 +1210,7 @@ class DefaultToolBox:
             return
 
         # check if directory exists, and if not, creates it
-        cairn_dir = ".cairn"
+        cairn_dir = self._get_cairn_dir()
         memory_dir = os.path.join(cairn_dir, "memory")
         if not os.path.exists(memory_dir):
             os.makedirs(memory_dir)

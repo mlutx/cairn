@@ -260,6 +260,80 @@
             display: block;
         }
 
+        .log-toggle {
+            background: #1f2937;
+            color: #94a3b8;
+            border: 1px solid #374151;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .log-toggle:hover {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-color: #4b5563;
+        }
+
+        .payload-toggle {
+            background: #1f2937;
+            color: #94a3b8;
+            border: 1px solid #374151;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .payload-toggle:hover {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-color: #4b5563;
+        }
+
+        .payload-toggle.active {
+            background: #1e40af;
+            color: #e2e8f0;
+            border-color: #3b82f6;
+        }
+
+        .payload-toggle .arrow {
+            display: inline-block;
+            transition: transform 0.2s ease;
+            opacity: 0.7;
+        }
+
+        .payload-toggle.active .arrow {
+            transform: rotate(180deg);
+            opacity: 1;
+        }
+
+        .payload-content {
+            display: none;
+            margin-top: 15px;
+            padding: 12px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+        }
+
+        .payload-content.visible {
+            display: block;
+        }
+
         .nested-tasks {
             margin-top: 15px;
             padding-left: 20px;
@@ -782,6 +856,19 @@
                     <textarea id="description" placeholder="e.g., Implement a health check endpoint"></textarea>
                 </div>
             </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="model-provider">Model Provider</label>
+                    <select id="model-provider" onchange="updateModelOptions()">
+                        <option value="anthropic">Anthropic</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="model-name">Model</label>
+                    <select id="model-name"></select>
+                </div>
+            </div>
             <div id="repo-fields">
                 <!-- Repo fields will be dynamically inserted here -->
             </div>
@@ -831,6 +918,8 @@
         const tasksContainer = document.getElementById('tasks-container');
         const debugMessagesContainer = document.getElementById('debug-messages');
         const alertContainer = document.getElementById('alert-container');
+        const modelProviderSelect = document.getElementById('model-provider');
+        const modelNameSelect = document.getElementById('model-name');
 
         // Log Modal elements
         const logModal = document.getElementById('log-modal');
@@ -853,6 +942,23 @@
         let renderedLogIds = new Set(); // Track which logs have been rendered
         let currentLogRunId = null; // Track which task's logs we're currently viewing
         let lastRenderedLogId = null; // Track the last log we rendered
+
+        // Add supported models configuration
+        const SUPPORTED_MODELS = {
+            "anthropic": [
+                "claude-sonnet-4-20250514",
+                "claude-3-7-sonnet-latest",
+                "claude-3-5-sonnet-latest",
+                "claude-3-5-haiku-latest"
+            ],
+            "openai": [
+                "gpt-4.1",
+                "gpt-4o-mini",
+                "gpt-4o",
+                "gpt-4",
+                "gpt-3.5-turbo"
+            ]
+        };
 
         function setLoading(isLoading) {
             document.body.classList.toggle('loading', isLoading);
@@ -968,22 +1074,109 @@
             repoFieldsContainer.innerHTML = html;
         }
 
+        // Store form state
+        let formState = {
+            description: '',
+            agentType: '',
+            modelProvider: '',
+            modelName: '',
+            repos: [],
+            repo: '',
+            branch: ''
+        };
+
+        // Function to save form state
+        function saveFormState() {
+            formState = {
+                description: descriptionInput.value,
+                agentType: agentTypeSelect.value,
+                modelProvider: modelProviderSelect.value,
+                modelName: modelNameSelect.value,
+                repos: document.getElementById('selected-repos')?.value.split(',').filter(r => r) || [],
+                repo: document.getElementById('repo')?.value || '',
+                branch: document.getElementById('branch')?.value || ''
+            };
+        }
+
+        // Function to restore form state
+        function restoreFormState() {
+            descriptionInput.value = formState.description;
+
+            // Restore agent type and update visibility
+            if (formState.agentType) {
+                agentTypeSelect.value = formState.agentType;
+                updateRepoVisibility();
+            }
+
+            // Restore model selections
+            if (formState.modelProvider) {
+                modelProviderSelect.value = formState.modelProvider;
+                updateModelOptions();
+                if (formState.modelName) {
+                    modelNameSelect.value = formState.modelName;
+                }
+            }
+
+            // Restore repo selections based on agent type
+            if (formState.agentType === 'Fullstack Planner') {
+                const selectedReposInput = document.getElementById('selected-repos');
+                if (selectedReposInput) {
+                    selectedReposInput.value = formState.repos.join(',');
+                    // Update visual selection state
+                    document.querySelectorAll('.repo-option').forEach(element => {
+                        const repo = element.getAttribute('data-repo');
+                        if (formState.repos.includes(repo)) {
+                            element.style.backgroundColor = '#30363d';
+                            element.style.borderColor = '#8b949e';
+                            element.style.color = '#f0f6fc';
+                        }
+                    });
+                }
+            } else {
+                const repoSelect = document.getElementById('repo');
+                const branchInput = document.getElementById('branch');
+                if (repoSelect) repoSelect.value = formState.repo;
+                if (branchInput) branchInput.value = formState.branch;
+            }
+        }
+
         window.resetForm = () => {
+            formState = {
+                description: '',
+                agentType: agentTypeSelect.options[0].value,
+                modelProvider: modelProviderSelect.options[0].value,
+                modelName: '',
+                repos: [],
+                repo: '',
+                branch: ''
+            };
             descriptionInput.value = '';
             agentTypeSelect.selectedIndex = 0;
+            modelProviderSelect.selectedIndex = 0;
+            updateModelOptions(); // Reset model options
             updateRepoVisibility();
         }
 
         window.kickoffAgent = async () => {
             const agent_type = agentTypeSelect.value;
             const description = descriptionInput.value.trim();
+            const model_provider = modelProviderSelect.value;
+            const model_name = modelNameSelect.value;
 
             if (!description) {
                 showAlert('Task description is required', 'error');
                 return;
             }
 
-            let payload = { description };
+            // Save form state before proceeding
+            saveFormState();
+
+            let payload = {
+                description,
+                model_provider,
+                model_name
+            };
+
             if (agent_type === 'Fullstack Planner') {
                 const selectedRepos = document.getElementById('selected-repos').value.split(',').filter(repo => repo);
                 payload.repos = selectedRepos;
@@ -1008,9 +1201,10 @@
                     throw new Error(err.detail || 'Failed to start agent');
                 }
                 const result = await response.json();
-                showAlert(`Agent started with Run ID: ${result.run_id}`);
-                resetForm();
                 fetchActiveTasks(); // immediate refresh
+
+                // Restore form state after successful kickoff
+                restoreFormState();
             } catch (error) {
                 showAlert(`Error: ${error.message}`, 'error');
             } finally {
@@ -1103,7 +1297,7 @@
 
         function renderTask(task, taskMap) {
             const payload = task.payload || {};
-            const { run_id, agent_type, agent_status, description, parent_run_id, parent_fullstack_id } = payload;
+            const { run_id, agent_type, agent_status, description, parent_run_id, parent_fullstack_id, model_provider, model_name } = payload;
             const statusClass = `status-${(agent_status || 'unknown').toLowerCase()}`;
             const taskId = run_id || task.task_id;
             const displayId = taskId;
@@ -1121,12 +1315,14 @@
                                payload.agent_output.list_of_subtasks.length > 0;
 
             // Create buttons HTML
-            let buttonsHtml = `<button class="secondary" onclick="viewLogs('${taskId}', '${displayId}')">View Logs</button>`;
+            let buttonsHtml = '';
 
             // For child tasks, also show parent task ID in the logs button
             if (parent_run_id || parent_fullstack_id) {
                 const parentId = parent_run_id || parent_fullstack_id;
-                buttonsHtml = `<button class="secondary" onclick="viewLogs('${taskId}', '${displayId} (Child of ${parentId})')">View Logs</button>`;
+                buttonsHtml = `<button class="log-toggle" onclick="event.stopPropagation(); viewLogs('${taskId}', '${displayId} (Child of ${parentId})')">Logs</button>`;
+            } else {
+                buttonsHtml = `<button class="log-toggle" onclick="event.stopPropagation(); viewLogs('${taskId}', '${displayId}')">Logs</button>`;
             }
 
             if (hasSubtasks) {
@@ -1144,7 +1340,6 @@
                 ).length;
 
                 if (allSubtasksRun) {
-                    buttonsHtml += `<button disabled class="all-subtasks-run">All PM Tasks Run</button>`;
                 } else if (runSubtasks > 0) {
                     buttonsHtml += `<button onclick="createSubtasks('${taskId}')">🚀 Create Remaining PM Tasks (${runSubtasks}/${childTasks.length} run)</button>`;
                 } else {
@@ -1340,27 +1535,34 @@
 
             return `
                 <div class="task ${taskClass}" data-task-id="${task.task_id}">
-                    <div class="task-header" onclick="toggleTask(this)">
+                    <div class="task-header" onclick="handleTaskHeaderClick(this, event)">
                         <div class="task-header-content">
                             <strong>${taskId}</strong> ${hasChildren ? `<span class="has-children-indicator">${childTasks.length} subtask${childTasks.length > 1 ? 's' : ''}</span>` : ''} (${agent_type || 'Unknown'})
+                            ${model_provider && model_name ? `<span style="font-size: 11px; color: #8b949e;">🤖 ${model_provider} / ${model_name}</span>` : ''}
                             <p style="font-size: 12px; color: #6b7280;">${truncatedDesc}</p>
                             ${hasParent ? `<p style="font-size: 11px; color: #9ca3af;">↑ ${parentType} ${parentId}</p>` : ''}
                             ${prLinksHtml}
                             ${subtaskStatus}
                         </div>
-                        <div style="display: flex; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;" onclick="event.stopPropagation();">
+                            ${buttonsHtml}
+                            <button class="payload-toggle" onclick="togglePayload('${task.task_id}')">
+                                Payload <span class="arrow">▼</span>
+                            </button>
                             <span class="status-badge ${statusClass}">${agent_status || 'UNKNOWN'}</span>
-                            <button class="delete-task-btn" onclick="event.stopPropagation(); deleteTask('${taskId}', ${hasChildren})">
+                            <button class="delete-task-btn" onclick="deleteTask('${taskId}', ${hasChildren})">
                                 <span style="margin-right: 3px;">🗑️</span> Delete
                             </button>
                         </div>
                     </div>
                     <div class="task-content">
                         ${showFullDescription ? `<div style="margin-top: 10px;"><p style="font-size: 12px; color: #6b7280;">${fullDesc}</p></div>` : ''}
+                        <div class="payload-content" id="payload-${task.task_id}">
+                            <div id="json-viewer-${task.task_id}"></div>
+                        </div>
                         ${subtaskCardsHtml}
                         <div class="button-row" style="margin-top: 15px;">
-                            ${buttonsHtml}
-                            ${runAllSubtasksButton}
+                            ${hasSubtasks ? buttonsHtml : ''}
                         </div>
                         ${childTasksHtml}
                     </div>
@@ -1514,7 +1716,12 @@
             logContainer.scrollTop = scrollPosition;
         }
 
-        window.toggleTask = (element) => {
+        window.handleTaskHeaderClick = (element, event) => {
+            // Don't toggle if we clicked a button
+            if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+                return;
+            }
+
             const taskElement = element.closest('.task');
             const taskId = taskElement.getAttribute('data-task-id');
             const content = element.nextElementSibling;
@@ -1526,17 +1733,31 @@
                 content.classList.add('expanded');
                 expandedTasks.add(taskId);
             }
+        };
 
-            // Show/hide the Run All button when expanding/collapsing
-            const runAllButton = content.querySelector('.run-all-subtasks');
-            if (runAllButton) {
-                if (content.classList.contains('expanded')) {
-                    runAllButton.style.display = 'inline-block';
-                } else {
-                    runAllButton.style.display = 'none';
+        window.togglePayload = (taskId) => {
+            const button = event.currentTarget;
+            event.stopPropagation();
+
+            // Toggle the active state of the button
+            button.classList.toggle('active');
+
+            // Find the payload content container
+            const payloadContent = document.getElementById(`payload-${taskId}`);
+            if (payloadContent) {
+                payloadContent.classList.toggle('visible');
+
+                // If the task content isn't expanded, expand it
+                const taskContent = payloadContent.closest('.task-content');
+                if (taskContent && !taskContent.classList.contains('expanded')) {
+                    taskContent.classList.add('expanded');
+                    const task = taskContent.closest('.task');
+                    if (task) {
+                        expandedTasks.add(task.getAttribute('data-task-id'));
+                    }
                 }
             }
-        }
+        };
 
         window.viewLogs = (runId, displayId) => {
             console.log('Opening log modal for runId:', runId, 'displayId:', displayId);
@@ -1790,11 +2011,7 @@
                 }
 
                 const result = await response.json();
-                if (childTasks.length > 0) {
-                    showAlert(`Task ${taskId} and ${childTasks.length} related subtask${childTasks.length > 1 ? 's' : ''} deleted successfully`);
-                } else {
-                    showAlert(result.message || `Task ${taskId} deleted successfully`);
-                }
+
                 fetchActiveTasks(); // Refresh to show updated tasks
 
             } catch (error) {
@@ -1805,14 +2022,9 @@
         }
 
         window.toggleRepoSelection = function(element) {
-            console.log('Toggle function called');
             const repo = element.getAttribute('data-repo');
-            console.log('Repo:', repo);
-
             const selectedReposInput = document.getElementById('selected-repos');
             const selectedRepos = selectedReposInput.value ? selectedReposInput.value.split(',').filter(r => r) : [];
-
-            console.log('Current selected repos:', selectedRepos);
 
             if (selectedRepos.includes(repo)) {
                 // Remove repo from selection
@@ -1820,17 +2032,16 @@
                 element.style.backgroundColor = '#0D1117';
                 element.style.borderColor = '#30363d';
                 element.style.color = '#c9d1d9';
-                console.log('Deselected repo:', repo);
             } else {
                 // Add repo to selection
                 selectedReposInput.value = [...selectedRepos, repo].join(',');
                 element.style.backgroundColor = '#30363d';
                 element.style.borderColor = '#8b949e';
                 element.style.color = '#f0f6fc';
-                console.log('Selected repo:', repo);
             }
 
-            console.log('Updated selected repos:', selectedReposInput.value);
+            // Save form state after repo selection changes
+            saveFormState();
         };
 
         // Add new function to handle single subtask creation
@@ -1867,6 +2078,27 @@
             }
         }
 
+        // Function to update model options based on selected provider
+        window.updateModelOptions = () => {
+            const provider = modelProviderSelect.value;
+            const models = SUPPORTED_MODELS[provider] || [];
+
+            modelNameSelect.innerHTML = models.map(model =>
+                `<option value="${model}">${model}</option>`
+            ).join('');
+        };
+
+        // Add event listeners to form fields to save state
+        function setupFormEventListeners() {
+            descriptionInput.addEventListener('input', saveFormState);
+            agentTypeSelect.addEventListener('change', saveFormState);
+            modelProviderSelect.addEventListener('change', saveFormState);
+            modelNameSelect.addEventListener('change', saveFormState);
+
+            // For repo fields, we'll handle in their respective update functions
+            // since they're dynamically created
+        }
+
         async function init() {
             try {
                 setLoading(true);
@@ -1874,6 +2106,12 @@
 
                 await fetchActiveTasks();
                 await fetchDebugMessages();
+
+                // Initialize model options
+                updateModelOptions();
+
+                // Setup form event listeners
+                setupFormEventListeners();
 
                 if (activeTimers.tasks) clearInterval(activeTimers.tasks);
                 if (activeTimers.debug) clearInterval(activeTimers.debug);

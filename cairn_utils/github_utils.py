@@ -71,8 +71,8 @@ def generate_jwt():
 
     payload = {
         "iat": int(time.time()) - 60,
-        "exp": int(time.time()) + (10 * 60),
-        "iss": APP_ID,
+        "exp": int(time.time()) + (10 * 5),
+        "iss": int(APP_ID),
     }
 
     return jwt.encode(payload, private_key, algorithm="RS256")
@@ -1929,85 +1929,4 @@ def decode_escape_sequences(content: str) -> str:
 
 
 if __name__ == "__main__":
-    # Example test for search_code function
-    # async def test_search_code():
-    #     # Get authentication tokens
-    #     jwt_token = generate_jwt()
-    #     installation_id = 65848345  # Replace with your installation ID
-    #     token = await get_installation_token(jwt_token, installation_id)
-
-    #     # Repository info
-    #     owner = "cairn-dev"
-    #     repo = "test"  # Repository in "owner/repo" format
-    #     fragment = 'def'  # Code fragment to search for
-    #     path = None  # Search in all files, or specify a path like "src/"
-
-    #     matches = await search_repo_code(token, owner, repo, fragment, path=path, context_lines=5)
-    #     import json
-    #     with open("matches.json", "w") as file:
-    #         json.dump(matches, file, indent=4)
-
-    # # Run the search test
-    # asyncio.run(test_search_code())
-
-    for i in range(50):
-        asyncio.run(run_flow(str(i)))
-
-    # Example test for applying unified diff to README.md
-    # async def test_unified_diff_application():
-    #     # Get authentication tokens
-    #     jwt_token = generate_jwt()
-    #     installation_id = 65848345  # Replace with your installation ID
-    #     token = await get_installation_token(jwt_token, installation_id)
-
-    #     # Repository info
-    #     owner = "cairn-dev"  # Replace with repository owner
-    #     repo = "test"  # Replace with repository name
-    #     branch = "main"  # Branch to modify
-    #     file_path = "README.md"  # File to modify
-
-    #     # Example unified diff - add a new second hunk that replaces a specific line
-    #     unified_diffs = [
-    #         # Hunk 2: Replace the line about Cairn GitHub App with "test hunk"
-    #         "@@ -1,1 +1,1 @@\n-This is a test repository used for Cairn GitHub App development.\n+test hunk"
-    #     ]
-
-    #     # Create changes dict for batch_update_files
-    #     path_to_changes = {
-    #         file_path: {
-    #             "unified_diffs": unified_diffs
-    #         }
-    #     }
-
-    #     print(f"Applying unified diffs to {file_path} in {owner}/{repo} branch {branch}...")
-    #     print(f"Number of hunks: {len(unified_diffs)}")
-
-    #     # Apply the changes
-    #     result = await batch_update_files(token, owner, repo, branch, path_to_changes)
-
-    #     # Display results
-    #     print(f"Modified {result['modified_files_count']} file(s)")
-    #     for file_path, diff_result in result.get("diff_results", {}).items():
-    #         print(f"\nFile: {file_path}")
-    #         print(f"Operation: {diff_result.get('operation', 'unknown')}")
-    #         print(f"Success: {diff_result.get('status', False)}")
-
-    #         # Show any failed hunks
-    #         if diff_result.get("failed_hunks"):
-    #             print("\nFailed hunks:")
-    #             for hunk in diff_result["failed_hunks"]:
-    #                 print(f"  - Hunk #{hunk['hunk_index']}: {hunk['reason']}")
-    #                 print(f"    {hunk['hunk']}")
-
-    #         # Show the new content
-    #         if file_path in result["modified_files_content"]:
-    #             print("\nNew content:")
-    #             print("-----------------------------------")
-    #             print(result["modified_files_content"][file_path])
-    #             print("-----------------------------------")
-
-    # # Run the test
-    # asyncio.run(test_unified_diff_application())
-
-    pass
-#
+    generate_jwt()

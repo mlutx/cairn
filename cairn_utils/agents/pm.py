@@ -6,6 +6,7 @@ import asyncio
 import os
 import sys
 import time
+import json
 from typing import Any, Dict, List
 
 from dotenv import load_dotenv
@@ -29,6 +30,7 @@ try:
     )
     from .swe import SoftwareEngineerAgent
     from .thought_logger import AgentLogger
+    from supported_models import find_supported_model_given_model_name
 except (ImportError, ModuleNotFoundError):
     # Add parent directory to path for tools and supabase_utils
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -56,6 +58,7 @@ except (ImportError, ModuleNotFoundError):
     )
     from llm_consts import ChatAnthropic
     from swe import SoftwareEngineerAgent
+    from supported_models import find_supported_model_given_model_name, SUPPORTED_MODELS
 
 
 class ProjectManagerAgent:
@@ -80,14 +83,16 @@ class ProjectManagerAgent:
         repos: list[str],
         installation_id: int,
         branch: str,
-        model_name: str = "claude-3-7-sonnet-latest",
+        model_provider: str,
+        model_name: str,
         llm_client=None,
         live_logging=False,
         subtask_id=None,
         supabase_client=None,
         run_id=None,
         running_locally=False,
-        other_agents=None
+        other_agents=None,
+        fake_calls_path: str = None
     ):
         """
         Set up the agent with necessary components.
@@ -106,7 +111,7 @@ class ProjectManagerAgent:
             running_locally (bool): Whether running locally
             other_agents (list[dict]): list of other agents' info to use for coordination.
             -> dict should have keys of run_id, description, and repo (each keyed to a string)
-
+            fake_calls_path (str): Path to JSON file containing fake LLM responses for testing
 
         Returns:
             ProjectManagerAgent: The configured agent instance
@@ -121,12 +126,13 @@ class ProjectManagerAgent:
         self.running_locally = running_locally
         self.other_agents = other_agents
         self.subtask_id = None
-
+        self.model_provider = model_provider
+        self.model_name = model_name
         # Setup clients and dependencies
         await self._setup_clients()
         await self._setup_swe_agent(owner, repos, installation_id, branch, model_name, run_id)
         await self._setup_toolbox(owner, repos, installation_id, branch, model_name)
-        self._setup_llm_and_logger(llm_client, model_name)
+        self._setup_llm_and_logger(llm_client, model_name, fake_calls_path)
         await self._setup_graph(repos, branch)
 
         if self.live_logging:
@@ -181,14 +187,34 @@ class ProjectManagerAgent:
         self.toolbox.set_swe(self.swe)
         await self.toolbox.authenticate()
 
-    def _setup_llm_and_logger(self, llm_client, model_name):
+    def _setup_llm_and_logger(self, llm_client, model_name, fake_calls_path=None):
         """Setup LLM client and logger."""
         if not self.logger:
             self.logger = AgentLogger(
                 run_id=self.run_id,
             )
 
-        self.llm_client = llm_client or ChatAnthropic(model=model_name)
+        # find the correct chat client
+        chat_info = SUPPORTED_MODELS[self.model_provider]
+        if not self.model_name in chat_info['models']:
+            print('-'*50)
+            print(f'[DEBUG] Model {self.model_name} not found in {self.model_provider} models. May not be supported!')
+            print('-'*50)
+
+        chat_client = chat_info['chat_class']
+        self.llm_client = chat_client(model=model_name)
+
+        # Load fake responses if path is provided
+        if fake_calls_path and os.path.exists(fake_calls_path):
+            try:
+                with open(fake_calls_path, "r") as f:
+                    fake_calls = json.load(f)
+                for fake_call in fake_calls.get("fake_calls", []):
+                    self.llm_client.add_fake_response(fake_call)
+                if self.live_logging:
+                    print(f"Loaded fake responses from {fake_calls_path}")
+            except Exception as e:
+                raise RuntimeError(f"Failed to load fake responses from {fake_calls_path}. This is a fatal error as test responses are required: {str(e)}")
 
     async def _setup_graph(self, repos, branch):
         """Create and configure the agent graph."""
