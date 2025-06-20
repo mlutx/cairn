@@ -9,6 +9,7 @@ from agents.llm_consts import (
     AnthropicResponse,
     ChatOpenAI,
     OpenAIResponse,
+    ChatGemini,
 )
 from difflib import SequenceMatcher
 
@@ -35,6 +36,21 @@ SUPPORTED_MODELS = {
             "gpt-4o",
             "gpt-4",
             "gpt-3.5-turbo",
+        ]
+    },
+
+    "gemini": {
+        "chat_class": ChatGemini,
+        "response_class": OpenAIResponse,
+        "models": [
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-2.5-pro",
+            "gemini-2.5-pro-preview-05-20",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-preview-05-20",
+            "gemini-1.5-pro",
+            "gemini-1.5-flash",
         ]
     }
 }

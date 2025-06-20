@@ -37,9 +37,9 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 | Provider | Status | Models |
 |----------|--------|---------|
-| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5 |
-| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo |
-| 🟡 **Gemini** | 🚧 Coming Soon |
+| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
+| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
+| 🟢 **Gemini** | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
 | 🟡 **Deepseek** | 🚧 Coming Soon |
 | 🟡 **Llama** | 🚧 Coming Soon |
 
@@ -56,22 +56,10 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 2. **Install dependencies**
 
-   **Option A: Using venv (recommended)**
+   **Using venv (recommended, but can use conda or system-wide installation as well)**
    ```bash
    python -m venv cairn-env
    source cairn-env/bin/activate  # On Windows: cairn-env\Scripts\activate
-   pip install -r requirements.txt
-   ```
-
-   **Option B: Using conda**
-   ```bash
-   conda create -n cairn python=3.10
-   conda activate cairn
-   pip install -r requirements.txt
-   ```
-
-   **Option C: System-wide (not recommended)**
-   ```bash
    pip install -r requirements.txt
    ```
 
@@ -110,8 +98,9 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
    4. Click **"Create GitHub App"** to finish
 
-   #### Step 2: Gather your credentials (3 required values)
-
+   ```
+   Step 2: Gather your credentials and install the app (3 required values)
+   ```
    ```
    • App ID: Copy from app settings page (displayed at top)
    • Private Key: Generate and download .pem file → save to cairn project root
@@ -151,9 +140,10 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    # Required scopes: repo (for private repos) or public_repo (for public repos only)
    GITHUB_TOKEN=your_github_token_here
 
-   # Anthropic API key (REQUIRED) - Get from https://console.anthropic.com/
+   # LLM API keys. Each is optional, add the ones you want to use.
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
    OPENAI_API_KEY=your_openai_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
 
    # Connected repositories - Format: "owner/repo-name,owner/repo-name" (comma-separated, no spaces)
    # Examples:
@@ -165,16 +155,10 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 ### Running Cairn
 
-#### Option 1 (recommended): Simple static HTML page.
 ```bash
 python fastapi_app/app.py
 ```
 Then, navigate to `http://0.0.0.0:8000` in your browser.
-
-#### Option 2: Nicer next.js frontend.
-```bash
-COMING SOON
-```
 
 ---
 
@@ -184,10 +168,10 @@ COMING SOON
 
 ### Your First Task
 
-1. **Access the interface** 
+1. **Access the interface** (via `http://0.0.0.0:8000`)
 2. **Select an agent type** (Fullstack Planner, PM, or SWE)
 - SWE: recommended for simple self-contained subtasks. Output is a branch with the changes.
-- PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR.
+- PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR detailing the changes.
 - Fullstack Planner: recommended for fullstack or multi-step tasks. Output is a list of subtasks that can be ran in parallel, and who will communicate if necessary on cross-subtask code.
 3. **Choose target repositories** from your connected repos
 4. **Describe your task** in natural language
@@ -361,13 +345,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap
 
-### Current Version (v0.1.0)
+### Current Version (v0.2.0)
 - ✅ Multi-agent task execution
 - ✅ GitHub integration
 - ✅ Simple web interface
+- ✅ OpenAI, Anthropic, & Gemini Support
 
 ### Coming Soon
-- OpenAI & Gemini support
 - Agent-runnable code environments
 - Pausable, playable, restartable tasks
 - Custom diff-application models
