@@ -56,22 +56,10 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 2. **Install dependencies**
 
-   **Option A: Using venv (recommended)**
+   **Using venv (recommended, but can use conda or system-wide installation as well)**
    ```bash
    python -m venv cairn-env
    source cairn-env/bin/activate  # On Windows: cairn-env\Scripts\activate
-   pip install -r requirements.txt
-   ```
-
-   **Option B: Using conda**
-   ```bash
-   conda create -n cairn python=3.10
-   conda activate cairn
-   pip install -r requirements.txt
-   ```
-
-   **Option C: System-wide (not recommended)**
-   ```bash
    pip install -r requirements.txt
    ```
 
@@ -113,7 +101,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    4. Click **"Create GitHub App"** to finish
 
    ```
-   Step 2: Gather your credentials (3 required values)
+   Step 2: Gather your credentials and install the app (3 required values)
    ```
    ```
    • App ID: Copy from app settings page (displayed at top)
@@ -164,15 +152,10 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 ### Running Cairn
 
-#### Option 1 (recommended): Simple static HTML page.
 ```bash
 python fastapi_app/app.py
 ```
 Then, navigate to `http://0.0.0.0:8000` in your browser.
-
-#### Option 2: Nicer next.js frontend.
-```bash
-COMING SOON
 ```
 
 ---
@@ -325,13 +308,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap
 
-### Current Version (v0.1.0)
+### Current Version (v0.2.0)
 - ✅ Multi-agent task execution
 - ✅ GitHub integration
 - ✅ Simple web interface
+- ✅ OpenAI, Anthropic, & Gemini Support
 
 ### Coming Soon
-- OpenAI & Gemini support
 - Agent-runnable code environments
 - Pausable, playable, restartable tasks
 - Custom diff-application models
