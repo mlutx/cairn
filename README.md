@@ -156,7 +156,6 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 python fastapi_app/app.py
 ```
 Then, navigate to `http://0.0.0.0:8000` in your browser.
-```
 
 ---
 
@@ -166,10 +165,10 @@ Then, navigate to `http://0.0.0.0:8000` in your browser.
 
 ### Your First Task
 
-1. **Access the interface** (web or terminal)
+1. **Access the interface** (via `http://0.0.0.0:8000`)
 2. **Select an agent type** (Fullstack Planner, PM, or SWE)
 - SWE: recommended for simple self-contained subtasks. Output is a branch with the changes.
-- PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR.
+- PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR detailing the changes.
 - Fullstack Planner: recommended for fullstack or multi-step tasks. Output is a list of subtasks that can be ran in parallel, and who will communicate if necessary on cross-subtask code.
 3. **Choose target repositories** from your connected repos
 4. **Describe your task** in natural language
