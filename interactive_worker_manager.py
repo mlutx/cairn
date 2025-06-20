@@ -67,7 +67,7 @@ class WorkerManager:
         # Load and parse repos.json
         try:
             with open("repos.json", "r") as f:
-                repo_data = json.load(f).get("connected_repos", [])
+                repo_data = json.load(f)
                 self.connected_repos = self._parse_connected_repos(repo_data)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             logger.error(f"Could not load or parse repos.json: {e}")
@@ -88,21 +88,24 @@ class WorkerManager:
         self.task_storage.add_debug_message(formatted_message)
         logger.debug(message)
 
-    def _parse_connected_repos(self, repo_data: List[dict]) -> List[Tuple[str, str]]:
+    def _parse_connected_repos(self, repo_data: dict) -> List[Tuple[str, str]]:
         """Parse data from repos.json into a list of (owner, repo) tuples"""
         if not repo_data:
-            print("Warning: connected_repos in repos.json is empty or not found.")
+            print("Warning: repos.json is empty or not found.")
             return []
 
         repos = []
-        for repo_info in repo_data:
-            owner = repo_info.get("owner")
-            repo = repo_info.get("name")
-            if owner and repo:
-                print(f"Found repository: {owner}/{repo}")
-                repos.append((owner, repo))
+        for owner, owner_data in repo_data.items():
+            if isinstance(owner_data, dict) and "connected_repos" in owner_data:
+                repo_list = owner_data["connected_repos"]
+                if isinstance(repo_list, list):
+                    for repo in repo_list:
+                        print(f"Found repository: {owner}/{repo}")
+                        repos.append((owner, repo))
+                else:
+                    print(f"Warning: connected_repos for {owner} is not a list: {repo_list}")
             else:
-                print(f"Warning: Invalid repository format in repos.json: {repo_info}")
+                print(f"Warning: Invalid owner data format for {owner}: {owner_data}")
 
         if not repos:
             print("Warning: No valid repositories found in repos.json")

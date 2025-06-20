@@ -138,21 +138,17 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    ANTHROPIC_MODEL_NAME=claude-sonnet-4-20250514
    ```
 
-   Create a `repos.json` file in the root of the project with the following structure. Add an entry for each repository you want to connect.
+   Create a `repos.json` file in the root of the project with the following structure. Group repositories by owner to avoid duplicating installation IDs.
     ```json
     {
-      "connected_repos": [
-        {
-          "name": "your-repo-name",
-          "owner": "your-github-username-or-org",
-          "installation_id": 12345678
-        },
-        {
-          "name": "another-repo",
-          "owner": "your-github-username-or-org",
-          "installation_id": 87654321
-        }
-      ]
+      "your-github-username-or-org": {
+        "connected_repos": ["your-repo-name", "another-repo"],
+        "installation_id": 12345678
+      },
+      "another-owner": {
+        "connected_repos": ["different-repo"],
+        "installation_id": 87654321
+      }
     }
     ```
 ---

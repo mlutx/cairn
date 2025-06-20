@@ -96,7 +96,7 @@ async def wrapper(payload: dict) -> dict:
     # Load repository configurations
     try:
         with open("repos.json", "r") as f:
-            repo_configs = json.load(f)["connected_repos"]
+            repo_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         payload.update({
             "agent_status": "Failed",
@@ -133,10 +133,10 @@ async def wrapper(payload: dict) -> dict:
 
     # Find the installation ID for the given owner and repo
     installation_id = None
-    for repo_config in repo_configs:
-        if repo_config["owner"] == owner and repo_config["name"] == target_repo:
-            installation_id = repo_config["installation_id"]
-            break
+    if owner in repo_data and isinstance(repo_data[owner], dict):
+        owner_config = repo_data[owner]
+        if "connected_repos" in owner_config and target_repo in owner_config["connected_repos"]:
+            installation_id = owner_config.get("installation_id")
 
     if not installation_id:
         error_msg = f"No installation ID found for {owner}/{target_repo} in repos.json"
