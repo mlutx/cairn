@@ -15,7 +15,20 @@
 
 </div>
 
-# Table of Contents
+## 🪨 What is Cairn?
+
+Cairn is a simple open-source background-agent system for coding. Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
+You can run Cairn locally, connect it to your github repos and use your favorite LLM to execute fullstack tasks, 100% in the background. Save time for the things you want to do by automating the boring stuff!
+
+| Provider | Status | Models |
+|----------|--------|---------|
+| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
+| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
+| 🟢 **Gemini** | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
+| 🟡 **Deepseek** | 🚧 Coming Soon |
+| 🟡 **Llama** | 🚧 Coming Soon |
+
+## Table of Contents
 
 - [What is Cairn?](#-what-is-cairn)
   - [Model Support](#model-support)
@@ -27,22 +40,6 @@
   - [Contributing](#contributing)
 - [License](#license)
 - [Roadmap](#roadmap)
-
-## 🪨 What is Cairn?
-
-Cairn is a simple open-source background-agent system. Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
-You can run Cairn locally, connect it to your repos, use your favorite LLM and execute fullstack tasks, 100% in the background. Save time for the things you want to do, not the boring stuff!
-
-### Model Support
-
-| Provider | Status | Models |
-|----------|--------|---------|
-| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
-| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
-| 🟢 **Gemini** | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
-| 🟡 **Deepseek** | 🚧 Coming Soon |
-| 🟡 **Llama** | 🚧 Coming Soon |
-
 
 ## Quick Start
 
@@ -109,7 +106,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    ```
 
    #### Step 3: Note your credentials for .env configuration
-   
+
    You'll need these three values for your `.env` file in the next step:
    - **App ID**: Your GitHub App ID
    - **Installation ID**: From the installation URL (see step 2)
@@ -358,7 +355,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Embedding search support (auto-updating with github webhooks)
 - and more...
 
-
+---
 
 <div align="center">
 
