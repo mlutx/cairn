@@ -65,11 +65,9 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 3. **Set up github access**
 
-   Cairn uses a self-hosted GitHub app (you own and control it) with read/write permissions to edit your repositories.
+   Cairn uses a self-hosted GitHub app (which you own and control) with read/write permissions to edit your repositories.
 
-   ```
-   Step 1: Create your GitHub App
-   ```
+   #### Step 1: Create your GitHub App
 
    **For Personal Account:**
    1. Navigate to [GitHub Apps Settings](https://github.com/settings/apps)
@@ -110,9 +108,8 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
      Then check browser URL: https://github.com/settings/installations/[INSTALLATION_ID]
    ```
 
-   ```
-   Step 3: Note your credentials for .env configuration
-   ```
+   #### Step 3: Note your credentials for .env configuration
+   
    You'll need these three values for your `.env` file in the next step:
    - **App ID**: Your GitHub App ID
    - **Installation ID**: From the installation URL (see step 2)
@@ -136,6 +133,12 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    GITHUB_APP_ID=your_app_id_here
    GITHUB_INSTALLATION_ID=your_installation_id_here
    GITHUB_PRIVATE_KEY_PATH=your_private_key_file.pem
+
+   # GitHub Personal Access Token (for repository analytics - optional)
+   # Required for viewing repository statistics, contributors, and code ownership data
+   # Get from: https://github.com/settings/tokens
+   # Required scopes: repo (for private repos) or public_repo (for public repos only)
+   GITHUB_TOKEN=your_github_token_here
 
    # LLM API keys. Each is optional, add the ones you want to use.
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
@@ -173,6 +176,41 @@ Then, navigate to `http://0.0.0.0:8000` in your browser.
 3. **Choose target repositories** from your connected repos
 4. **Describe your task** in natural language
 5. **Monitor progress** through real-time logs and status updates
+
+---
+
+### Repository Analytics (Optional)
+
+Cairn includes powerful repository analytics features that provide insights into your connected repositories, including:
+
+- **Contributor Statistics**: View contributor activity, commit counts, and contribution patterns
+- **Language Distribution**: See the breakdown of programming languages used in your repositories
+- **Code Ownership**: Track which files are primarily maintained by which contributors
+- **Commit Patterns**: Analyze development activity by time of day, day of week, and month
+
+#### Enabling Analytics
+
+To enable repository analytics, you need to configure a GitHub Personal Access Token:
+
+1. **Generate a Personal Access Token**:
+   - Go to [GitHub Settings > Tokens](https://github.com/settings/tokens)
+   - Click "Generate new token (classic)"
+   - Select appropriate scopes:
+     - For **public repositories**: `public_repo`
+     - For **private repositories**: `repo`
+   - Copy the generated token
+
+2. **Add to your .env file**:
+   ```bash
+   GITHUB_TOKEN=your_github_token_here
+   ```
+
+3. **Access Analytics**:
+   - Navigate to the repository management page in the Cairn UI
+   - Click on any connected repository to view detailed analytics
+   - View contributor graphs, language statistics, and development patterns
+
+**Note**: The analytics feature is optional. If no `GITHUB_TOKEN` is provided, the core agent functionality will work normally, but repository statistics will not be available.
 
 ---
 
