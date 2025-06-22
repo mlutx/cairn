@@ -12,6 +12,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useState } from "react";
+import sweAvatar from "@/assets/swe-icon.png";
+import pmAvatar from "@/assets/pm-icon.png";
+import fullstackAvatar from "@/assets/fullstack-icon.png";
 
 interface TaskCardProps {
   task: Task;
@@ -86,6 +89,22 @@ export default function TaskCard({ task, onClick }: TaskCardProps) {
       ? task.agent_type.substring(0, 1)
       : "U";
 
+  // Get the appropriate avatar based on agent type
+  const getAgentAvatar = () => {
+    switch (task.agent_type) {
+      case "SWE":
+        return sweAvatar;
+      case "PM":
+        return pmAvatar;
+      case "Fullstack":
+        return fullstackAvatar;
+      default:
+        return null;
+    }
+  };
+
+  const agentAvatar = getAgentAvatar();
+
   // Handle dialog click to prevent it from triggering the card onClick
   const handleDialogClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -124,7 +143,16 @@ export default function TaskCard({ task, onClick }: TaskCardProps) {
       <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
-            <AvatarImage src={assignee?.avatar} />
+            {agentAvatar ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <AvatarImage
+                  src={agentAvatar}
+                  className="w-4 h-4 object-contain"
+                />
+              </div>
+            ) : (
+              <AvatarImage src={assignee?.avatar} />
+            )}
             <AvatarFallback>{assigneeInitials}</AvatarFallback>
           </Avatar>
           <span>{assigneeName}</span>

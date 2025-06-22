@@ -55,6 +55,9 @@ import { taskApi } from "@/lib/api/task";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTasks } from "@/contexts/TaskContext";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import sweAvatar from "@/assets/swe-icon.png";
+import pmAvatar from "@/assets/pm-icon.png";
+import fullstackAvatar from "@/assets/fullstack-icon.png";
 
 // Mock team members data
 const mockTeamMembers: TeamUser[] = [
@@ -297,6 +300,20 @@ export default function ListView({ project = "" }: ListViewProps) {
     setLogsDialogOpen(true);
   };
 
+  // Get the appropriate avatar based on agent type
+  const getAgentAvatar = (agentType: string | undefined): string | undefined => {
+    switch (agentType) {
+      case "SWE":
+        return sweAvatar;
+      case "PM":
+        return pmAvatar;
+      case "Fullstack":
+        return fullstackAvatar;
+      default:
+        return undefined;
+    }
+  };
+
   // Memoize filtered and sorted tasks to prevent unnecessary re-renders
   const { filteredTasks, paginatedTasks, totalPages } = useMemo(() => {
     // Start with all tasks
@@ -531,9 +548,20 @@ export default function ListView({ project = "" }: ListViewProps) {
                         <StatusBadge status={task.status} />
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {task.agent_type || 'Unassigned'}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {task.agent_type && getAgentAvatar(task.agent_type) && (
+                            <div className="w-5 h-5 flex items-center justify-center">
+                              <img
+                                src={getAgentAvatar(task.agent_type)}
+                                alt={task.agent_type}
+                                className="w-4 h-4 object-contain"
+                              />
+                            </div>
+                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {task.agent_type || 'Unassigned'}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm">{format(new Date(task.created_at), "MMM d, yyyy")}</TableCell>
                       <TableCell className="text-sm pr-6">

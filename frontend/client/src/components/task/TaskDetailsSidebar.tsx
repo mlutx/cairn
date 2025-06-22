@@ -41,6 +41,9 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { TaskStatus } from "@/types/task";
+import sweAvatar from "@/assets/swe-icon.png";
+import pmAvatar from "@/assets/pm-icon.png";
+import fullstackAvatar from "@/assets/fullstack-icon.png";
 
 interface TaskComment {
   id: string;
@@ -111,7 +114,7 @@ export default function TaskDetailsSidebar({ task, isOpen, onClose }: TaskDetail
     {
       id: "1",
       content: "Started working on the task",
-      author: task.assignees?.[0] || "System",
+      author: task.agent_type || "System",
       created_at: new Date().toISOString(),
     },
   ]);
@@ -209,7 +212,7 @@ export default function TaskDetailsSidebar({ task, isOpen, onClose }: TaskDetail
       task: task.id,
       status: "Todo",
       description,
-      assignee: user?.id || task.assignees?.[0] || "",
+      assignee: user?.id || "",
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subtasks", task.id] });
@@ -240,30 +243,42 @@ export default function TaskDetailsSidebar({ task, isOpen, onClose }: TaskDetail
 
   // Get assignee details with more robust matching
   const assignee = teamMembers.find((member: TeamUser) => {
-    // Try different ID formats
-    return task.assignees?.some(assigneeId =>
-      member.uid === assigneeId || // Exact match
-      member.uid?.toString() === assigneeId?.toString() || // String comparison
-      member.account_email_address === assigneeId // Try email
-    );
+    // Since the Task type doesn't have assignees property, we'll skip this check
+    return false;
   });
 
   // Get assignee name with fallback
   const assigneeName = assignee
     ? `${assignee.first_name} ${assignee.last_name}`
-    : task.assignees?.[0] || "Unassigned";
+    : task.agent_type || "Unassigned";
   const assigneeInitials = assignee
     ? getInitials(`${assignee.first_name} ${assignee.last_name}`)
-    : task.assignees?.[0]
-      ? getInitials(task.assignees[0])
+    : task.agent_type
+      ? task.agent_type.substring(0, 1)
       : "U";
+
+  // Get the appropriate avatar based on agent type
+  const getAgentAvatar = () => {
+    switch (task.agent_type) {
+      case "SWE":
+        return sweAvatar;
+      case "PM":
+        return pmAvatar;
+      case "Fullstack":
+        return fullstackAvatar;
+      default:
+        return null;
+    }
+  };
+
+  const agentAvatar = getAgentAvatar();
 
   // Initialize the form after user is available
   useEffect(() => {
     if (user) {
       setSubtaskForm({
         status: "Todo",
-        assignee: user.id || task.assignees?.[0] || "",
+        assignee: user.id || "",
         description: "",
         assigned_to_agent: false,
         tags: [],
@@ -279,7 +294,7 @@ export default function TaskDetailsSidebar({ task, isOpen, onClose }: TaskDetail
     const comment: TaskComment = {
       id: Date.now().toString(),
       content: newComment,
-      author: task.assignees?.[0] || "System",
+      author: user?.id || "System",
       created_at: new Date().toISOString(),
     };
 
@@ -345,7 +360,7 @@ export default function TaskDetailsSidebar({ task, isOpen, onClose }: TaskDetail
       // Reset form
       setSubtaskForm({
         status: "Todo",
-        assignee: user?.id || task.assignees?.[0] || "",
+        assignee: user?.id || "",
         description: "",
         assigned_to_agent: false,
         tags: [],
@@ -422,7 +437,16 @@ export default function TaskDetailsSidebar({ task, isOpen, onClose }: TaskDetail
 
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={assignee?.avatar} />
+                    {agentAvatar ? (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <AvatarImage
+                          src={agentAvatar}
+                          className="w-6 h-6 object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <AvatarImage src={assignee?.avatar} />
+                    )}
                     <AvatarFallback>{assigneeInitials}</AvatarFallback>
                   </Avatar>
                   <div>
