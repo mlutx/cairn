@@ -138,7 +138,8 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    ANTHROPIC_MODEL_NAME=claude-sonnet-4-20250514
    ```
 
-   Create a `repos.json` file in the root of the project with the following structure. Group repositories by owner to avoid duplicating installation IDs.
+   Create a blank file `repos.json` in the root of the project (or modify the existing one) with the following structure. Group repositories by owner to avoid duplicating installation IDs.
+   Example:
     ```json
     {
       "your-github-username-or-org": {
