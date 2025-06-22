@@ -4,7 +4,7 @@ import { TaskStatus } from "@/types/task";
 import TaskCard from "./TaskCard";
 import TaskForm from "./TaskForm";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskDetailsSidebar from "./TaskDetailsSidebar";
 import { useTasks } from "@/contexts/TaskContext";
@@ -69,35 +69,77 @@ const sortTasksByDueDate = (tasks: Task[]): Task[] => {
   });
 };
 
+// Helper function to check if a task is a child task
+const isChildTask = (task: Task): boolean => {
+  return !!task.parent_run_id || !!task.parent_fullstack_id;
+};
+
 export default function KanbanBoard({ project }: KanbanBoardProps) {
   const [selectedTask, setSelectedTask] = useState<Task | undefined>(undefined);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(false);
   const [logsDialogOpen, setLogsDialogOpen] = useState(false);
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const { tasks, isLoading, error } = useTasks();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Toggle task expansion
+  const toggleTaskExpansion = (taskId: string) => {
+    const newExpandedTasks = new Set(expandedTasks);
+    if (newExpandedTasks.has(taskId)) {
+      newExpandedTasks.delete(taskId);
+    } else {
+      newExpandedTasks.add(taskId);
+    }
+    setExpandedTasks(newExpandedTasks);
+  };
+
   // Memoize filtered tasks to prevent unnecessary re-renders
-  const { projectTasks, queuedTasks, runningTasks, doneTasks, failedTasks } = useMemo(() => {
+  const { projectTasks, queuedTasks, runningTasks, doneTasks, failedTasks, taskMap, childTaskMap } = useMemo(() => {
     // Filter tasks by project if specified
     const filteredTasks = project
       ? tasks.filter(task => task.project === project)
       : tasks;
 
-    // Filter tasks by status and sort by due date
+    // Create a map of tasks by their IDs for quick lookup
+    const taskMap = new Map<string, Task>();
+    filteredTasks.forEach(task => {
+      taskMap.set(task.id, task);
+    });
+
+    // Create a map of child tasks by their parent IDs
+    const childTaskMap = new Map<string, Task[]>();
+    filteredTasks.forEach(task => {
+      // Check for parent relationship
+      if (task.parent_run_id || task.parent_fullstack_id) {
+        const parentId = task.parent_run_id || task.parent_fullstack_id;
+        if (parentId) {
+          const children = childTaskMap.get(parentId) || [];
+          children.push(task);
+          childTaskMap.set(parentId, children);
+        }
+      }
+    });
+
+    // Get only parent tasks (tasks without parent_run_id or parent_fullstack_id)
+    const getParentTasks = (tasks: Task[]): Task[] => {
+      return tasks.filter(task => !isChildTask(task));
+    };
+
+    // Filter tasks by status and get only parent tasks
     const queued = sortTasksByDueDate(
-      filteredTasks.filter((task: Task) => task.status === "Queued")
+      getParentTasks(filteredTasks.filter((task: Task) => task.status === "Queued"))
     );
     const running = sortTasksByDueDate(
-      filteredTasks.filter((task: Task) => task.status === "Running")
+      getParentTasks(filteredTasks.filter((task: Task) => task.status === "Running"))
     );
     const done = sortTasksByDueDate(
-      filteredTasks.filter((task: Task) => task.status === "Done")
+      getParentTasks(filteredTasks.filter((task: Task) => task.status === "Done"))
     );
     const failed = sortTasksByDueDate(
-      filteredTasks.filter((task: Task) => task.status === "Failed")
+      getParentTasks(filteredTasks.filter((task: Task) => task.status === "Failed"))
     );
 
     return {
@@ -106,6 +148,8 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
       runningTasks: running,
       doneTasks: done,
       failedTasks: failed,
+      taskMap,
+      childTaskMap
     };
   }, [tasks, project]);
 
@@ -128,6 +172,46 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
   const handleViewLogsClick = (columnId: string) => {
     setSelectedColumnId(columnId);
     setLogsDialogOpen(true);
+  };
+
+  // Render a task card with expansion controls if needed
+  const renderTaskCard = (task: Task, nestingLevel: number = 0) => {
+    const hasChildren = task.sibling_subtask_ids && task.sibling_subtask_ids.length > 0;
+    const isExpanded = expandedTasks.has(task.id);
+    const childTasks = childTaskMap.get(task.id) || [];
+    const hasChildTasks = childTasks.length > 0;
+
+    // Create expansion control if task has children
+    const expansionControl = (hasChildren || hasChildTasks) ? (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-5 w-5 p-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleTaskExpansion(task.id);
+        }}
+      >
+        {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      </Button>
+    ) : null;
+
+    return (
+      <div key={task.id} className="transition-all duration-300 ease-in-out">
+        <TaskCard
+          task={task}
+          onClick={() => handleTaskClick(task)}
+          expansionControl={expansionControl}
+        />
+
+        {/* Show child tasks when expanded */}
+        {isExpanded && hasChildTasks && (
+          <div className="pl-4 mt-2 border-l-2 border-slate-600 space-y-2">
+            {childTasks.map((childTask: Task) => renderTaskCard(childTask, nestingLevel + 1))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Kanban column component
@@ -177,14 +261,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
             <p>No tasks</p>
           </div>
         ) : (
-          tasks.map((task, index) => (
-            <div key={task.id} className="transition-all duration-300 ease-in-out">
-              <TaskCard
-                task={task}
-                onClick={() => handleTaskClick(task)}
-              />
-            </div>
-          ))
+          tasks.map(task => renderTaskCard(task))
         )}
       </div>
     </div>

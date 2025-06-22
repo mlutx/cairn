@@ -19,6 +19,8 @@ import fullstackAvatar from "@/assets/fullstack-icon.png";
 interface TaskCardProps {
   task: Task;
   onClick?: () => void;
+  className?: string;
+  expansionControl?: React.ReactNode;
 }
 
 // Mock team members data
@@ -68,7 +70,7 @@ const mockLogs = {
   ]
 };
 
-export default function TaskCard({ task, onClick }: TaskCardProps) {
+export default function TaskCard({ task, onClick, className, expansionControl }: TaskCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Get assignee details with more robust matching
@@ -112,7 +114,7 @@ export default function TaskCard({ task, onClick }: TaskCardProps) {
 
   return (
     <div
-      className="p-2 bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition-shadow cursor-pointer space-y-1"
+      className={`p-2 bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition-shadow cursor-pointer space-y-1 ${className || ''}`}
       onClick={onClick}
     >
       <div className="flex items-start justify-between">
@@ -157,9 +159,12 @@ export default function TaskCard({ task, onClick }: TaskCardProps) {
           </Avatar>
           <span>{assigneeName}</span>
         </div>
-        {task.due_date && (
-          <span>{format(new Date(task.due_date), "MMM d, yyyy")}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {expansionControl}
+          {task.due_date && (
+            <span>{format(new Date(task.due_date), "MMM d, yyyy")}</span>
+          )}
+        </div>
       </div>
     </div>
   );

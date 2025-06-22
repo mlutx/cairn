@@ -44,6 +44,17 @@ export interface Task {
   dueDate?: string;
   topic?: string;
   project?: string;
+  priority?: string;
+  assignees?: string[];
+  // Parent-child relationship fields:
+  // For PM tasks: parent_fullstack_id refers to parent Fullstack task
+  parent_fullstack_id?: string;
+  // For SWE tasks: parent_run_id refers to parent PM task
+  parent_run_id?: string;
+  // For tasks that are related but not in parent-child relationship
+  related_run_ids?: string[];
+  // For parent tasks (Fullstack or PM): IDs of child tasks
+  sibling_subtask_ids?: string[];
 }
 
 export interface User {

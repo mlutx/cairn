@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Task, FilterOptions, TeamUser } from "@/types";
 import { AgentType } from "@/types/task";
@@ -31,7 +31,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import TaskForm from "./TaskForm";
-import { ArrowUpDown, ChevronDown, ChevronUp, Download, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronUp, Download, Pencil, Trash2, ChevronRight } from "lucide-react";
 import { getInitials } from "@/lib/utils/task-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import TaskDetailsSidebar from "./TaskDetailsSidebar";
@@ -119,6 +119,11 @@ const columns = [
   { id: 'actions', label: 'Actions', sortable: false },
 ];
 
+// Helper function to check if a task is a child task
+const isChildTask = (task: Task): boolean => {
+  return !!task.parent_run_id || !!task.parent_fullstack_id;
+};
+
 interface ListViewProps {
   project?: string;
 }
@@ -152,6 +157,7 @@ export default function ListView({ project = "" }: ListViewProps) {
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(false);
   const [logsDialogOpen, setLogsDialogOpen] = useState(false);
   const [selectedTaskForLogs, setSelectedTaskForLogs] = useState<Task | null>(null);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const pageSize = 10;
   const { user } = useAuth();
   const teamId = user?.team_id;
@@ -159,6 +165,18 @@ export default function ListView({ project = "" }: ListViewProps) {
 
   // Use mock team members data instead of API call
   const teamMembers = mockTeamMembers;
+
+  // Toggle task expansion
+  const toggleTaskExpansion = (taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newExpandedTasks = new Set(expandedTasks);
+    if (newExpandedTasks.has(taskId)) {
+      newExpandedTasks.delete(taskId);
+    } else {
+      newExpandedTasks.add(taskId);
+    }
+    setExpandedTasks(newExpandedTasks);
+  };
 
   // Update URL when filter options change
   useEffect(() => {
@@ -300,7 +318,7 @@ export default function ListView({ project = "" }: ListViewProps) {
     setLogsDialogOpen(true);
   };
 
-  // Get the appropriate avatar based on agent type
+  // Get agent avatar based on agent type
   const getAgentAvatar = (agentType: string | undefined): string | undefined => {
     switch (agentType) {
       case "SWE":
@@ -314,8 +332,116 @@ export default function ListView({ project = "" }: ListViewProps) {
     }
   };
 
+  // Helper function to render child tasks recursively
+  const renderChildTasks = (parentTask: Task, childTaskMap: Map<string, Task[]>, level: number) => {
+    const childTasks = childTaskMap.get(parentTask.id) || [];
+    if (childTasks.length === 0) return null;
+
+    return childTasks.map((childTask: Task) => (
+      <Fragment key={childTask.id}>
+        <TableRow
+          className="cursor-pointer hover:bg-muted/50 bg-muted/20 border-l-2 border-blue-500"
+          onClick={() => handleTaskClick(childTask)}
+        >
+          <TableCell className="font-regular text-sm">
+            <div className="flex items-center" style={{ paddingLeft: `${level * 20 + 6}px` }}>
+              {/* First, always render the return arrow for consistent alignment */}
+              <span className="text-xs text-muted-foreground mr-2 w-4 inline-block text-center">↳</span>
+
+              {/* Then, create a container for the expansion button and title */}
+              <div className="flex items-center gap-2">
+                {/* Conditionally render expansion button */}
+                {((childTask.sibling_subtask_ids && childTask.sibling_subtask_ids.length > 0) ||
+                  (childTaskMap.get(childTask.id) && childTaskMap.get(childTask.id)!.length > 0)) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 p-0"
+                    onClick={(e) => toggleTaskExpansion(childTask.id, e)}
+                  >
+                    {expandedTasks.has(childTask.id) ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                  </Button>
+                )}
+                {/* Always render the title */}
+                {childTask.title}
+              </div>
+            </div>
+          </TableCell>
+          <TableCell>
+            <StatusBadge status={childTask.status} />
+          </TableCell>
+          <TableCell>
+            <div className="flex items-center gap-2">
+              {childTask.agent_type && getAgentAvatar(childTask.agent_type) && (
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <img
+                    src={getAgentAvatar(childTask.agent_type)}
+                    alt={childTask.agent_type}
+                    className="w-4 h-4 object-contain"
+                  />
+                </div>
+              )}
+              <Badge variant="outline" className="text-xs">
+                {childTask.agent_type || 'Unassigned'}
+              </Badge>
+            </div>
+          </TableCell>
+          <TableCell className="text-sm">{format(new Date(childTask.created_at), "MMM d, yyyy")}</TableCell>
+          <TableCell className="text-sm pr-6">
+            {childTask.due_date ? format(new Date(childTask.due_date), "MMM d, yyyy") : "-"}
+          </TableCell>
+          <TableCell className="text-right">
+            <div className="flex justify-end space-x-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleViewLogsClick(childTask);
+                }}
+                title="View Logs"
+              >
+                <span className="text-xs">🪵</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditClick(childTask);
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(childTask.id);
+                }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+
+        {/* Recursively render this child's children if expanded */}
+        {expandedTasks.has(childTask.id) && renderChildTasks(childTask, childTaskMap, level + 1)}
+      </Fragment>
+    ));
+  };
+
   // Memoize filtered and sorted tasks to prevent unnecessary re-renders
-  const { filteredTasks, paginatedTasks, totalPages } = useMemo(() => {
+  const { filteredTasks, paginatedTasks, totalPages, childTaskMap } = useMemo(() => {
     // Start with all tasks
     let filtered = tasks;
 
@@ -341,8 +467,25 @@ export default function ListView({ project = "" }: ListViewProps) {
       );
     }
 
+    // Create a map of child tasks by their parent IDs
+    const childTaskMap = new Map<string, Task[]>();
+    filtered.forEach(task => {
+      // Check for parent relationship
+      if (task.parent_run_id || task.parent_fullstack_id) {
+        const parentId = task.parent_run_id || task.parent_fullstack_id;
+        if (parentId) {
+          const children = childTaskMap.get(parentId) || [];
+          children.push(task);
+          childTaskMap.set(parentId, children);
+        }
+      }
+    });
+
+    // Filter out child tasks from main list (we'll show them nested under parents)
+    const parentTasks = filtered.filter(task => !isChildTask(task));
+
     // Sort tasks
-    filtered.sort((a: Task, b: Task) => {
+    parentTasks.sort((a: Task, b: Task) => {
       const aValue = a[filterOptions.sortBy as keyof Task];
       const bValue = b[filterOptions.sortBy as keyof Task];
 
@@ -364,8 +507,8 @@ export default function ListView({ project = "" }: ListViewProps) {
     });
 
     // Calculate pagination
-    const total = Math.ceil(filtered.length / pageSize);
-    const paginated = filtered.slice(
+    const total = Math.ceil(parentTasks.length / pageSize);
+    const paginated = parentTasks.slice(
       (currentPage - 1) * pageSize,
       currentPage * pageSize
     );
@@ -373,7 +516,8 @@ export default function ListView({ project = "" }: ListViewProps) {
     return {
       filteredTasks: filtered,
       paginatedTasks: paginated,
-      totalPages: total
+      totalPages: total,
+      childTaskMap
     };
   }, [tasks, project, filterOptions, currentPage, pageSize]);
 
@@ -538,74 +682,102 @@ export default function ListView({ project = "" }: ListViewProps) {
                 </TableHeader>
                 <TableBody>
                   {paginatedTasks.map((task: Task) => (
-                    <TableRow
-                      key={task.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleTaskClick(task)}
-                    >
-                      <TableCell className="font-regular text-sm pl-6">{task.title}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={task.status} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {task.agent_type && getAgentAvatar(task.agent_type) && (
-                            <div className="w-5 h-5 flex items-center justify-center">
-                              <img
-                                src={getAgentAvatar(task.agent_type)}
-                                alt={task.agent_type}
-                                className="w-4 h-4 object-contain"
-                              />
+                    <Fragment key={task.id}>
+                      <TableRow
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleTaskClick(task)}
+                      >
+                        <TableCell className="font-regular text-sm pl-6">
+                          <div className="flex items-center">
+                            {/* Create a consistent width placeholder for the arrow that child rows have */}
+                            <span className="w-4 inline-block"></span>
+
+                            {/* Container for expansion button and title */}
+                            <div className="flex items-center gap-2">
+                              {((task.sibling_subtask_ids && task.sibling_subtask_ids.length > 0) || (childTaskMap.get(task.id) && childTaskMap.get(task.id)!.length > 0)) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 p-0"
+                                  onClick={(e) => toggleTaskExpansion(task.id, e)}
+                                >
+                                  {expandedTasks.has(task.id) ? (
+                                    <ChevronDown className="h-3 w-3" />
+                                  ) : (
+                                    <ChevronRight className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              )}
+                              {task.title}
                             </div>
-                          )}
-                          <Badge variant="outline" className="text-xs">
-                            {task.agent_type || 'Unassigned'}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{format(new Date(task.created_at), "MMM d, yyyy")}</TableCell>
-                      <TableCell className="text-sm pr-6">
-                        {task.due_date ? format(new Date(task.due_date), "MMM d, yyyy") : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewLogsClick(task);
-                            }}
-                            title="View Logs"
-                          >
-                            <span className="text-xs">🪵</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditClick(task);
-                            }}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(task.id);
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={task.status} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {task.agent_type && getAgentAvatar(task.agent_type) && (
+                              <div className="w-5 h-5 flex items-center justify-center">
+                                <img
+                                  src={getAgentAvatar(task.agent_type)}
+                                  alt={task.agent_type}
+                                  className="w-4 h-4 object-contain"
+                                />
+                              </div>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              {task.agent_type || 'Unassigned'}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{format(new Date(task.created_at), "MMM d, yyyy")}</TableCell>
+                        <TableCell className="text-sm pr-6">
+                          {task.due_date ? format(new Date(task.due_date), "MMM d, yyyy") : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewLogsClick(task);
+                              }}
+                              title="View Logs"
+                            >
+                              <span className="text-xs">🪵</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(task);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(task.id);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Render child tasks recursively when parent is expanded */}
+                      {expandedTasks.has(task.id) && renderChildTasks(task, childTaskMap, 1)}
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
