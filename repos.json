@@ -1,7 +1,7 @@
 {
-  "jabrams-11": {
-    "connected_repos": ["cairntesting", "robot"],
-    "installation_id": 70913333
+  "<owner name, e.g. your username or your-work-org>": {
+    "connected_repos": ["frontend", "backend"],
+    "installation_id": 12345678
   }
 } 
 
