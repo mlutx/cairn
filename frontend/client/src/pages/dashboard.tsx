@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusIcon, Filter } from "lucide-react";
+import { PlusIcon, Filter, Github } from "lucide-react";
 import KanbanBoard from "@/components/task/KanbanBoard";
 import ListView from "@/components/task/ListView";
 import TaskForm from "@/components/task/TaskForm";
@@ -9,12 +9,14 @@ import { useTasks } from "@/contexts/TaskContext";
 import "@/styles/linear-ui.css";
 import { useSearchParams } from "react-router-dom";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { RepoModal } from "@/components/repos/RepoModal";
 
 export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = searchParams.get('view') || "kanban";
   const [activeView, setActiveView] = useState<string>(initialView);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
+  const [repoModalOpen, setRepoModalOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number>(0);
   const { isLoading } = useTasks();
@@ -70,6 +72,15 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setRepoModalOpen(true)}
+              className="h-9 w-9"
+              title="View connected repositories"
+            >
+              <Github className="h-5 w-5" />
+            </Button>
+            <Button
               size="sm"
               variant="outline"
               className="linear-button"
@@ -103,6 +114,8 @@ export default function Dashboard() {
         onOpenChange={setIsTaskFormOpen}
         mode="create"
       />
+      {/* Repository Modal */}
+      <RepoModal open={repoModalOpen} onOpenChange={setRepoModalOpen} />
     </div>
   );
 }

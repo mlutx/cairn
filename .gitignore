@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+.next/
+
+
+repos.json
 cairn-env/
 
 backend-env/

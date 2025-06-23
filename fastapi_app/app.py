@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 
@@ -72,6 +73,54 @@ background_loop = None
 background_thread = None
 worker_manager = None
 
+# Cache for repos and settings
+cache = {
+    "installation_ids": {},
+    "settings": {
+        "general_rules": [],
+        "repo_specific_rules": {}
+    },
+    "last_updated": 0
+}
+
+def load_installation_ids():
+    """Load installation IDs from repos.json"""
+    installation_ids = {}
+    try:
+        with open("repos.json", "r") as f:
+            repo_data = json.load(f)
+            for owner, owner_data in repo_data.items():
+                if isinstance(owner_data, dict) and "installation_id" in owner_data:
+                    installation_ids[owner] = owner_data["installation_id"]
+        logger.info("Successfully loaded installation IDs from repos.json")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.error(f"Could not load or parse repos.json: {e}")
+    return installation_ids
+
+def load_settings():
+    """Load settings from .cairn/settings.json"""
+    settings = {
+        "general_rules": [],
+        "repo_specific_rules": {}
+    }
+    try:
+        settings_path = Path(".cairn/settings.json")
+        if settings_path.exists():
+            with open(settings_path, "r") as f:
+                settings = json.load(f)
+            logger.info("Successfully loaded settings from .cairn/settings.json")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.error(f"Could not load or parse .cairn/settings.json: {e}")
+    return settings
+
+def refresh_cache():
+    """Refresh the cache with updated data"""
+    global cache
+    cache["installation_ids"] = load_installation_ids()
+    cache["settings"] = load_settings()
+    cache["last_updated"] = time.time()
+    logger.info(f"Cache refreshed at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
 def run_background_loop():
     """Run the background event loop for processing WorkerManager tasks"""
     global background_loop
@@ -113,6 +162,9 @@ async def lifespan(app: FastAPI):
     # Create WorkerManager instance
     worker_manager = WorkerManager()
 
+    # Initialize cache
+    refresh_cache()
+
     # Start the background event loop in a separate thread
     background_thread = threading.Thread(target=run_background_loop, daemon=True)
     background_thread.start()
@@ -141,6 +193,15 @@ async def lifespan(app: FastAPI):
         logger.info("Background thread finished")
 
 app = FastAPI(title="Cairn Task Manager API", version="1.0.0", lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Frontend dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Get the absolute path to the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
@@ -336,8 +397,37 @@ async def get_repos():
     """Get list of connected repositories"""
     if not worker_manager:
         raise HTTPException(status_code=503, detail="WorkerManager not initialized")
+
+    # Check if we need to refresh the cache (e.g., if files have been modified)
+    repos_json_path = Path("repos.json")
+    settings_json_path = Path(".cairn/settings.json")
+
+    repos_modified = repos_json_path.exists() and repos_json_path.stat().st_mtime > cache["last_updated"]
+    settings_modified = settings_json_path.exists() and settings_json_path.stat().st_mtime > cache["last_updated"]
+
+    if repos_modified or settings_modified:
+        logger.info("Configuration files have been modified, refreshing cache")
+        refresh_cache()
+
+    # Build response with installation IDs and settings from cache
+    repos = []
+    for owner, repo in worker_manager.connected_repos:
+        repo_info = {
+            "owner": owner,
+            "repo": repo
+        }
+        if owner in cache["installation_ids"]:
+            repo_info["installation_id"] = cache["installation_ids"][owner]
+
+        # Add repo-specific rules if available
+        if repo in cache["settings"].get("repo_specific_rules", {}):
+            repo_info["rules"] = cache["settings"]["repo_specific_rules"][repo]
+
+        repos.append(repo_info)
+
     return {
-        "repos": [{"owner": owner, "repo": repo} for owner, repo in worker_manager.connected_repos]
+        "repos": repos,
+        "general_rules": cache["settings"].get("general_rules", [])
     }
 
 @app.post("/api/repos")
@@ -345,25 +435,25 @@ async def add_repo(repo: dict):
     """Add a new repository"""
     if not worker_manager:
         raise HTTPException(status_code=503, detail="WorkerManager not initialized")
-    
+
     owner = repo.get("owner")
     repo_name = repo.get("repo")
-    
+
     if not owner or not repo_name:
         raise HTTPException(status_code=400, detail="Both owner and repo are required")
-    
+
     # Add to connected repos
     if (owner, repo_name) not in worker_manager.connected_repos:
         worker_manager.connected_repos.append((owner, repo_name))
-        
+
         # Update environment variable
         repos_str = ",".join([f"{o}/{r}" for o, r in worker_manager.connected_repos])
         os.environ["CONNECTED_REPOS"] = repos_str
-        
+
         # Update .env file
         with open(".env", "r") as f:
             env_content = f.read()
-        
+
         if "CONNECTED_REPOS=" in env_content:
             # Replace existing CONNECTED_REPOS line
             env_content = re.sub(
@@ -374,10 +464,10 @@ async def add_repo(repo: dict):
         else:
             # Add new CONNECTED_REPOS line
             env_content += f"\nCONNECTED_REPOS={repos_str}\n"
-        
+
         with open(".env", "w") as f:
             f.write(env_content)
-    
+
     return {"message": f"Repository {owner}/{repo_name} added successfully"}
 
 @app.delete("/api/repos/{owner}/{repo}")
@@ -385,19 +475,19 @@ async def delete_repo(owner: str, repo: str):
     """Remove a repository"""
     if not worker_manager:
         raise HTTPException(status_code=503, detail="WorkerManager not initialized")
-    
+
     # Remove from connected repos
     if (owner, repo) in worker_manager.connected_repos:
         worker_manager.connected_repos.remove((owner, repo))
-        
+
         # Update environment variable
         repos_str = ",".join([f"{o}/{r}" for o, r in worker_manager.connected_repos])
         os.environ["CONNECTED_REPOS"] = repos_str
-        
+
         # Update .env file
         with open(".env", "r") as f:
             env_content = f.read()
-        
+
         if "CONNECTED_REPOS=" in env_content:
             # Replace existing CONNECTED_REPOS line
             env_content = re.sub(
@@ -408,10 +498,10 @@ async def delete_repo(owner: str, repo: str):
         else:
             # Add new CONNECTED_REPOS line
             env_content += f"\nCONNECTED_REPOS={repos_str}\n"
-        
+
         with open(".env", "w") as f:
             f.write(env_content)
-    
+
     return {"message": f"Repository {owner}/{repo} removed successfully"}
 
 @app.get("/config")
@@ -994,7 +1084,7 @@ async def get_repo_stats(owner: str, repo: str):
     """Get repository statistics including contributors and code ownership"""
     if not worker_manager:
         raise HTTPException(status_code=503, detail="WorkerManager not initialized")
-    
+
     # Get GitHub token from environment
     github_token = os.getenv("GITHUB_TOKEN")
     if not github_token:
@@ -1002,7 +1092,7 @@ async def get_repo_stats(owner: str, repo: str):
             status_code=400,
             detail="GITHUB_TOKEN_MISSING"
         )
-    
+
     try:
         # Fetch repository data using GitHub API
         headers = {
@@ -1049,30 +1139,30 @@ async def get_repo_stats(owner: str, repo: str):
 
             # Create a mapping of Git author names to GitHub usernames
             author_mapping = {}
-            
+
             def normalize_author_name(git_name, github_login, email=None):
                 """Normalize author names to prefer GitHub usernames"""
                 if github_login:
                     return github_login
-                
+
                 # Apply heuristics for common name variations
                 if git_name:
                     # Convert to lowercase for comparison
                     name_lower = git_name.lower()
-                    
+
                     # Common patterns: "First Last" -> try to match with GitHub usernames
                     # For now, just use the Git name but we could add more sophisticated matching
                     return git_name
-                
+
                 return git_name or "Unknown"
-            
+
             # First pass: build author mapping from contributors API and commit data
             contributor_logins = {contributor["login"].lower(): contributor["login"] for contributor in contributors}
-            
+
             # Common author name mappings (you can add more as needed)
             manual_mappings = {
                 "Benjamin Rich": "brrich",
-                "benjamin rich": "brrich", 
+                "benjamin rich": "brrich",
                 # Add more mappings as needed
             }
 
@@ -1084,21 +1174,21 @@ async def get_repo_stats(owner: str, repo: str):
                 )
                 commit_details.raise_for_status()
                 commit_data = commit_details.json()
-                
+
                 # Get author info
                 git_author_name = commit_data["commit"]["author"]["name"]
                 git_author_email = commit_data["commit"]["author"].get("email", "")
                 github_author = None
-                
+
                 # Try to get GitHub username from commit data
                 if "author" in commit_data and commit_data["author"]:
                     github_author = commit_data["author"]["login"]
                 elif "committer" in commit_data and commit_data["committer"]:
                     github_author = commit_data["committer"]["login"]
-                
+
                 # Determine the display author using multiple strategies
                 display_author = git_author_name
-                
+
                 # Strategy 1: Use GitHub username if available
                 if github_author:
                     display_author = github_author
@@ -1115,11 +1205,11 @@ async def get_repo_stats(owner: str, repo: str):
                         if first_name and (first_name in login.lower() or login.lower() in first_name):
                             display_author = login
                             break
-                
+
                 # Build mapping
                 author_mapping[git_author_name] = display_author
                 logger.info(f"Mapped Git author '{git_author_name}' to display author '{display_author}'")
-            
+
             logger.info(f"Final author mapping: {author_mapping}")
 
             # Second pass: process commits using the mapping
@@ -1131,22 +1221,22 @@ async def get_repo_stats(owner: str, repo: str):
                 )
                 commit_details.raise_for_status()
                 commit_data = commit_details.json()
-                
+
                 # Get the Git author name and map it to display author
                 git_author_name = commit_data["commit"]["author"]["name"]
                 display_author = author_mapping.get(git_author_name, git_author_name)
-                
+
                 # Process file ownership
                 for file in commit_data.get("files", []):
                     filename = file["filename"]
                     if filename not in file_ownership:
                         file_ownership[filename] = {"authors": {}, "last_modified": None}
-                    
+
                     # Calculate lines changed (additions + deletions) for this file in this commit
                     additions = file.get("additions", 0)
                     deletions = file.get("deletions", 0)
                     lines_changed = additions + deletions
-                    
+
                     # Initialize author data structure if needed
                     if display_author not in file_ownership[filename]["authors"]:
                         file_ownership[filename]["authors"][display_author] = {
@@ -1155,16 +1245,16 @@ async def get_repo_stats(owner: str, repo: str):
                             "additions": 0,
                             "deletions": 0
                         }
-                    
+
                     # Update author statistics
                     file_ownership[filename]["authors"][display_author]["commits"] += 1
                     file_ownership[filename]["authors"][display_author]["lines_changed"] += lines_changed
                     file_ownership[filename]["authors"][display_author]["additions"] += additions
                     file_ownership[filename]["authors"][display_author]["deletions"] += deletions
-                    
+
                     if not file_ownership[filename]["last_modified"]:
                         file_ownership[filename]["last_modified"] = commit_data["commit"]["author"]["date"]
-                
+
                 # Process commit timing
                 if "commit" in commit_data and "author" in commit_data["commit"]:
                     commit_date = commit_data["commit"]["author"]["date"]
@@ -1172,19 +1262,19 @@ async def get_repo_stats(owner: str, repo: str):
                         try:
                             from datetime import datetime
                             dt = datetime.strptime(commit_date, "%Y-%m-%dT%H:%M:%SZ")
-                            
+
                             # Hour of day (0-23)
                             hour = dt.hour
                             commit_times['hour_of_day'][hour] += 1
-                            
+
                             # Day of week (0=Monday, 6=Sunday)
                             day = dt.weekday()
                             commit_times['day_of_week'][day] += 1
-                            
+
                             # Month (0=January, 11=December)
                             month = dt.month - 1
                             commit_times['month'][month] += 1
-                            
+
                             # Track author commits using display_author
                             if display_author not in commit_authors:
                                 commit_authors[display_author] = {
@@ -1234,6 +1324,19 @@ async def get_repo_stats(owner: str, repo: str):
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/repos/refresh-cache")
+async def refresh_repos_cache():
+    """Manually refresh the repos and settings cache"""
+    if not worker_manager:
+        raise HTTPException(status_code=503, detail="WorkerManager not initialized")
+
+    refresh_cache()
+
+    return {
+        "message": "Cache refreshed successfully",
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
 
 if __name__ == "__main__":
     import uvicorn
