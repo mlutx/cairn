@@ -93,7 +93,61 @@ async def wrapper(payload: dict) -> dict:
 
     # Load environment variables
     load_dotenv()
-    installation_id = int(os.getenv("GITHUB_INSTALLATION_ID"))
+
+    # Load repository configurations
+    try:
+        with open("repos.json", "r") as f:
+            repo_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        payload.update({
+            "agent_status": "Failed",
+            "error": f"Error loading or parsing repos.json: {e}",
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+        print(f"ERROR: Could not load or parse repos.json: {e}")
+        return payload
+
+    # Determine owner and repo(s) from payload
+    owner = payload.get("owner")
+    repo_name = payload.get("repo") # For SWE/PM
+    repo_names = payload.get("repos", []) # For Fullstack Planner
+
+    if not owner:
+        payload.update({
+            "agent_status": "Failed",
+            "error": "Owner not specified in payload",
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+        print("ERROR: Owner not specified in payload")
+        return payload
+
+    target_repo = repo_name if repo_name else (repo_names[0] if repo_names else None)
+
+    if not target_repo:
+        payload.update({
+            "agent_status": "Failed",
+            "error": "No repository specified in payload",
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+        print("ERROR: No repository specified in payload")
+        return payload
+
+    # Find the installation ID for the given owner and repo
+    installation_id = None
+    if owner in repo_data and isinstance(repo_data[owner], dict):
+        owner_config = repo_data[owner]
+        if "connected_repos" in owner_config and target_repo in owner_config["connected_repos"]:
+            installation_id = owner_config.get("installation_id")
+
+    if not installation_id:
+        error_msg = f"No installation ID found for {owner}/{target_repo} in repos.json"
+        payload.update({
+            "agent_status": "Failed",
+            "error": error_msg,
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+        print(f"ERROR: {error_msg}")
+        return payload
 
     # Create a unique run ID if not provided
     if not payload.get("run_id"):
