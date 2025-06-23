@@ -1,0 +1,7 @@
+{
+  "<owner name, e.g. your username or your-work-org>": {
+    "connected_repos": ["frontend", "backend"],
+    "installation_id": 12345678
+  }
+} 
+

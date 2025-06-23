@@ -108,12 +108,13 @@ You can run Cairn locally, connect it to your github repos and use your favorite
      Then check browser URL: https://github.com/settings/installations/[INSTALLATION_ID]
    ```
 
-   #### Step 3: Note your credentials for .env configuration
+   ### Step 3: Note your credentials for .env and repos.json configuration
 
-   You'll need these three values for your `.env` file in the next step:
-   - **App ID**: Your GitHub App ID
-   - **Installation ID**: From the installation URL (see step 2)
-   - **Private Key Path**: Path to your downloaded .pem file
+   You'll need these three values for your configuration:
+   - **App ID**: Goes in your `.env` file.
+   - **Private Key Path**: Path to your downloaded .pem file, goes in your `.env` file.
+   - **Installation ID**: Goes in the `repos.json` file.
+
 
    ```
    ⚠️  Security: Keep your .pem file secure and never commit it to version control
@@ -121,7 +122,7 @@ You can run Cairn locally, connect it to your github repos and use your favorite
    ```
 
 
-3. **Configure environment variables**
+3. **Configure environment variables and repositories**
    ```bash
    # Copy the example environment file
    cp .env.example .env
@@ -129,9 +130,8 @@ You can run Cairn locally, connect it to your github repos and use your favorite
 
    Edit your `.env` file with the following configuration:
    ```bash
-   # GitHub App credentials (from Step 3 above)
+   # GitHub App credentials
    GITHUB_APP_ID=your_app_id_here
-   GITHUB_INSTALLATION_ID=your_installation_id_here
    GITHUB_PRIVATE_KEY_PATH=your_private_key_file.pem
 
    # GitHub Personal Access Token (for repository analytics - optional)
@@ -144,13 +144,22 @@ You can run Cairn locally, connect it to your github repos and use your favorite
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
    OPENAI_API_KEY=your_openai_api_key_here
    GEMINI_API_KEY=your_gemini_api_key_here
-
-   # Connected repositories - Format: "owner/repo-name,owner/repo-name" (comma-separated, no spaces)
-   # Examples:
-   CONNECTED_REPOS="john-doe/my-frontend,john-doe/my-backend"
-   # Or for a single repository:
-   # CONNECTED_REPOS="mycompany/main-project"
    ```
+
+   Create a blank file `repos.json` in the root of the project (or modify the existing one) with the following structure. Group repositories by owner to avoid duplicating installation IDs.
+   Example:
+    ```json
+    {
+      "your-github-username-or-org": {
+        "connected_repos": ["your-repo-name", "another-repo"],
+        "installation_id": 12345678
+      },
+      "another-owner": {
+        "connected_repos": ["different-repo"],
+        "installation_id": 87654321
+      }
+    }
+    ```
 ---
 
 ### Running Cairn
