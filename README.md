@@ -11,25 +11,40 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688.svg)](https://fastapi.tiangolo.com/)
 [![Contributing](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](.github/CONTRIBUTING.md)
 
-[🚀 Quick Start](#-quick-start) | [📖 Documentation](https://try-cairn.com) | <span style="margin-left:-5px">[<img src="https://logos-world.net/wp-content/uploads/2020/12/Discord-Emblem.png" alt="Discord" width="30" height="15" style="position:relative; top:3px; margin-right:-7px;"/> Discord](https://discord.gg/C67EdrKN)</span> | [🐛 Issues](https://github.com/cairn-dev/cairn/issues) | [🤝 Contributing](.github/CONTRIBUTING.md)
+[🚀 Quick Start](#-quick-start) | [📖 Documentation](https://try-cairn.com) | [<img src="https://logos-world.net/wp-content/uploads/2020/12/Discord-Emblem.png" alt="Discord" width="30" height="15" style="position:relative; top:3px; margin-right:-7px;"/> Discord](https://discord.gg/C67EdrKN) | [🐛 Issues](https://github.com/cairn-dev/cairn/issues) | [🤝 Contributing](.github/CONTRIBUTING.md)
 
 </div>
 
+# Table of Contents
+
+- [What is Cairn?](#-what-is-cairn)
+  - [Model Support](#model-support)
+- [Quick Start](#quick-start)
+  - [Installation](#installation)
+- [Architecture Overview](#architecture-overview)
+- [Development](#development)
+  - [Project Structure](#project-structure)
+  - [Contributing](#contributing)
+- [License](#license)
+- [Roadmap](#roadmap)
 
 ## 🪨 What is Cairn?
 
 Cairn is a simple open-source background-agent system. Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
 You can run Cairn locally, connect it to your repos, use your favorite LLM and execute fullstack tasks, 100% in the background. Save time for the things you want to do, not the boring stuff!
 
-### 🤖 Model Support
+### Model Support
 
 | Provider | Status | Models |
 |----------|--------|---------|
-| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5 |
-| 🟡 **OpenAI** | 🚧 Coming Soon |
-| 🟡 **Gemini** | 🚧 Coming Soon |
+| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
+| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
+| 🟢 **Gemini** | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
+| 🟡 **Deepseek** | 🚧 Coming Soon |
+| 🟡 **Llama** | 🚧 Coming Soon |
 
-## 🚀 Quick Start
+
+## Quick Start
 
 ### Installation
 
@@ -41,32 +56,18 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 2. **Install dependencies**
 
-   **Option A: Using venv (recommended)**
+   **Using venv (recommended, but can use conda or system-wide installation as well)**
    ```bash
    python -m venv cairn-env
    source cairn-env/bin/activate  # On Windows: cairn-env\Scripts\activate
    pip install -r requirements.txt
    ```
 
-   **Option B: Using conda**
-   ```bash
-   conda create -n cairn python=3.10
-   conda activate cairn
-   pip install -r requirements.txt
-   ```
-
-   **Option C: System-wide (not recommended)**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
 3. **Set up github access**
 
-   Cairn uses a self-hosted GitHub app (you own and control it) with read/write permissions to edit your repositories.
+   Cairn uses a self-hosted GitHub app (which you own and control) with read/write permissions to edit your repositories.
 
-   ```
-   Step 1: Create your GitHub App
-   ```
+   #### Step 1: Create your GitHub App
 
    **For Personal Account:**
    1. Navigate to [GitHub Apps Settings](https://github.com/settings/apps)
@@ -98,7 +99,7 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    4. Click **"Create GitHub App"** to finish
 
    ```
-   Step 2: Gather your credentials (3 required values)
+   Step 2: Gather your credentials and install the app (3 required values)
    ```
    ```
    • App ID: Copy from app settings page (displayed at top)
@@ -106,14 +107,14 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    • Installation ID: Click "Install App" → Select repositories → Install
      Then check browser URL: https://github.com/settings/installations/[INSTALLATION_ID]
    ```
-
-   ```
-   Step 3: Note your credentials for .env and repos.json configuration
-   ```
+   
+   ### Step 3: Note your credentials for .env and repos.json configuration
+   
    You'll need these three values for your configuration:
    - **App ID**: Goes in your `.env` file.
    - **Private Key Path**: Path to your downloaded .pem file, goes in your `.env` file.
    - **Installation ID**: Goes in the `repos.json` file.
+
 
    ```
    ⚠️  Security: Keep your .pem file secure and never commit it to version control
@@ -133,9 +134,16 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    GITHUB_APP_ID=your_app_id_here
    GITHUB_PRIVATE_KEY_PATH=your_private_key_file.pem
 
-   # Anthropic API key (REQUIRED) - Get from https://console.anthropic.com/
+   # GitHub Personal Access Token (for repository analytics - optional)
+   # Required for viewing repository statistics, contributors, and code ownership data
+   # Get from: https://github.com/settings/tokens
+   # Required scopes: repo (for private repos) or public_repo (for public repos only)
+   GITHUB_TOKEN=your_github_token_here
+
+   # LLM API keys. Each is optional, add the ones you want to use.
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   ANTHROPIC_MODEL_NAME=claude-sonnet-4-20250514
+   OPENAI_API_KEY=your_openai_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
    ```
 
    Create a blank file `repos.json` in the root of the project (or modify the existing one) with the following structure. Group repositories by owner to avoid duplicating installation IDs.
@@ -154,18 +162,12 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
     ```
 ---
 
-### 🏃 Running Cairn
+### Running Cairn
 
-#### Option 1 (recommended): Simple static HTML page.
 ```bash
 python fastapi_app/app.py
 ```
 Then, navigate to `http://0.0.0.0:8000` in your browser.
-
-#### Option 2: Nicer next.js frontend.
-```bash
-COMING SOON
-```
 
 ---
 
@@ -175,10 +177,10 @@ COMING SOON
 
 ### Your First Task
 
-1. **Access the interface** (web or terminal)
+1. **Access the interface** (via `http://0.0.0.0:8000`)
 2. **Select an agent type** (Fullstack Planner, PM, or SWE)
 - SWE: recommended for simple self-contained subtasks. Output is a branch with the changes.
-- PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR.
+- PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR detailing the changes.
 - Fullstack Planner: recommended for fullstack or multi-step tasks. Output is a list of subtasks that can be ran in parallel, and who will communicate if necessary on cross-subtask code.
 3. **Choose target repositories** from your connected repos
 4. **Describe your task** in natural language
@@ -186,7 +188,42 @@ COMING SOON
 
 ---
 
-## ⚙️ Cairn Settings & Memory
+### Repository Analytics (Optional)
+
+Cairn includes powerful repository analytics features that provide insights into your connected repositories, including:
+
+- **Contributor Statistics**: View contributor activity, commit counts, and contribution patterns
+- **Language Distribution**: See the breakdown of programming languages used in your repositories
+- **Code Ownership**: Track which files are primarily maintained by which contributors
+- **Commit Patterns**: Analyze development activity by time of day, day of week, and month
+
+#### Enabling Analytics
+
+To enable repository analytics, you need to configure a GitHub Personal Access Token:
+
+1. **Generate a Personal Access Token**:
+   - Go to [GitHub Settings > Tokens](https://github.com/settings/tokens)
+   - Click "Generate new token (classic)"
+   - Select appropriate scopes:
+     - For **public repositories**: `public_repo`
+     - For **private repositories**: `repo`
+   - Copy the generated token
+
+2. **Add to your .env file**:
+   ```bash
+   GITHUB_TOKEN=your_github_token_here
+   ```
+
+3. **Access Analytics**:
+   - Navigate to the repository management page in the Cairn UI
+   - Click on any connected repository to view detailed analytics
+   - View contributor graphs, language statistics, and development patterns
+
+**Note**: The analytics feature is optional. If no `GITHUB_TOKEN` is provided, the core agent functionality will work normally, but repository statistics will not be available.
+
+---
+
+## Cairn Settings & Memory
 
 Cairn maintains local configuration and memory through a `.cairn/` directory that gets automatically created in your project root when you run tasks locally.
 
@@ -232,7 +269,7 @@ Cairn maintains local configuration and memory through a `.cairn/` directory tha
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```mermaid
 graph TB
@@ -269,7 +306,7 @@ For example, if you assign a task like "retrieve user metrics from our supabase 
 We use subprocess to spawn multiple parallel processes, SQLite as a persistent database, and FastAPI to provide a simple frontend.
 
 
-## 🛠️ Development
+## Development
 
 ### Project Structure
 
@@ -311,32 +348,32 @@ We provide several issue templates to help you report bugs, request features, or
 
 When submitting a pull request, please use our [Pull Request Template](.github/pull_request_template.md) to ensure your contribution includes all the necessary information.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🗺️ Roadmap
+## Roadmap
 
-### Current Version (v0.1.0)
+### Current Version (v0.2.0)
 - ✅ Multi-agent task execution
 - ✅ GitHub integration
 - ✅ Simple web interface
+- ✅ OpenAI, Anthropic, & Gemini Support
 
 ### Coming Soon
-- 🌐 OpenAI & Gemini support
-- 🖥️ Agent-runnable code environments
-- ▶️ Pausable, playable, restartable tasks
-- 🎯 Custom diff-application models
-- 🔍 Embedding search support (auto-updating with github webhooks)
+- Agent-runnable code environments
+- Pausable, playable, restartable tasks
+- Custom diff-application models
+- Embedding search support (auto-updating with github webhooks)
 - and more...
 
 
-<!--
+
 <div align="center">
 
 [![Star History Chart](https://api.star-history.com/svg?repos=cairn-dev/cairn&type=Date)](https://www.star-history.com/#cairn-dev/cairn&Date)
 
-</div> -->
+</div>
 
 ---
 

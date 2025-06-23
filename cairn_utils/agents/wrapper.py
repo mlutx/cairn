@@ -72,6 +72,7 @@ from .fullstack_planner import ExplorerAgent
 from .pm import ProjectManagerAgent
 from .swe import SoftwareEngineerAgent
 from ..task_storage import TaskStorage
+from ..supported_models import find_supported_model_given_model_name
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -221,10 +222,21 @@ async def wrapper(payload: dict) -> dict:
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
     })
 
-    model_name = os.getenv("ANTHROPIC_MODEL_NAME")
-
     # Create and setup the appropriate agent
     try:
+        # Get model info directly from payload - don't add defaults as per user request
+        model_provider = payload.get("model_provider")
+        model_name = payload.get("model_name")
+
+        # Validate model exists in supported models
+        provider, model_info = find_supported_model_given_model_name(model_name)
+        if not provider or not model_info:
+            raise ValueError(f"Model {model_name} not found in supported models")
+
+        # Use the provider from payload, don't override
+        if not model_provider:
+            model_provider = provider
+
         if agent_type == "SWE":
             agent = SoftwareEngineerAgent()
             await agent.setup(
@@ -235,6 +247,7 @@ async def wrapper(payload: dict) -> dict:
                 live_logging=False,
                 run_id=run_id,
                 subtask_id=None,
+                model_provider=model_provider,
                 model_name=model_name,
                 running_locally=True,
                 other_agents=other_agents if other_agents else None
@@ -249,6 +262,7 @@ async def wrapper(payload: dict) -> dict:
                 live_logging=False,
                 run_id=run_id,
                 subtask_id=None,
+                model_provider=model_provider,
                 model_name=model_name,
                 running_locally=True,
                 other_agents=other_agents if other_agents else None
@@ -263,6 +277,7 @@ async def wrapper(payload: dict) -> dict:
                 live_logging=False,
                 run_id=run_id,
                 subtask_id=None,
+                model_provider=model_provider,
                 model_name=model_name,
                 running_locally=True,
             )
