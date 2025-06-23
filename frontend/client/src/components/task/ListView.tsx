@@ -687,11 +687,8 @@ export default function ListView({ project = "" }: ListViewProps) {
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => handleTaskClick(task)}
                       >
-                        <TableCell className="font-regular text-sm pl-6">
+                        <TableCell className="font-regular text-sm">
                           <div className="flex items-center">
-                            {/* Create a consistent width placeholder for the arrow that child rows have */}
-                            <span className="w-4 inline-block"></span>
-
                             {/* Container for expansion button and title */}
                             <div className="flex items-center gap-2">
                               {((task.sibling_subtask_ids && task.sibling_subtask_ids.length > 0) || (childTaskMap.get(task.id) && childTaskMap.get(task.id)!.length > 0)) && (

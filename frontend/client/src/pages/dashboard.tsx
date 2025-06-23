@@ -35,6 +35,21 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', calculateHeight);
   }, []);
 
+    // Add keyboard shortcut for Cmd+K to toggle task form
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsTaskFormOpen(prevState => !prevState); // Toggle the form state
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Update URL when tab changes
   useEffect(() => {
     const newParams = new URLSearchParams(searchParams);
@@ -92,10 +107,10 @@ export default function Dashboard() {
             <Button
               size="sm"
               className="linear-button"
-              onClick={() => setIsTaskFormOpen(true)}
+              onClick={() => setIsTaskFormOpen(prev => !prev)}
             >
               <PlusIcon className="linear-button-icon mr-1" />
-              <span>Add Task</span>
+              <span>Add Task <span className="ml-1 opacity-70 text-xs">⌘+K</span></span>
             </Button>
           </div>
         </div>

@@ -27,7 +27,7 @@ import { Task, TaskFormData, TeamUser } from "@/types";
 import { AgentType, TaskStatus } from "@/types/task";
 import { useToast } from "@/components/ui/use-toast";
 import { taskApi } from "@/lib/api/task";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -45,6 +45,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { fetchConnectedRepos } from "@/lib/api";
 
 const customStyles = `
   /* Select item styles */
@@ -268,8 +269,6 @@ const customStyles = `
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-
-
 // Task form validation schema
 const taskFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -293,15 +292,13 @@ interface TaskFormProps {
   mode?: "create" | "edit";
 }
 
-// Mock data for repositories
-const mockRepositories = {
-  "repo-1": { name: "Frontend App", url: "https://github.com/org/frontend" },
-  "repo-2": { name: "Backend API", url: "https://github.com/org/backend" },
-  "repo-3": { name: "Documentation", url: "https://github.com/org/docs" }
-};
-
-// Mock topics
-const mockTopics = ["Frontend", "Backend", "Documentation", "DevOps", "Testing"];
+// Repository interface
+interface Repository {
+  owner: string;
+  repo: string;
+  installation_id?: number;
+  rules?: string[];
+}
 
 export default function TaskForm({ open, onOpenChange, initialData, mode = "create" }: TaskFormProps) {
   const { toast } = useToast();
@@ -311,19 +308,12 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [customTag, setCustomTag] = useState("");
   const [allReposSelected, setAllReposSelected] = useState(mode === "create");
+  const [repositories, setRepositories] = useState<Record<string, Repository>>({});
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Agent types
   const agentTypes = ["Fullstack", "PM", "SWE", "Unassigned"];
-
-  // Reset loading state and initialize when form opens
-  useEffect(() => {
-    if (open) {
-      // Initialize default state for create mode
-      if (mode === "create") {
-        setAllReposSelected(true);
-      }
-    }
-  }, [open, mode]);
 
   // Initialize form with default values
   const form = useForm<TaskFormValues>({
@@ -332,33 +322,84 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       title: initialData?.title || "",
       description: initialData?.description || "",
       status: (mode === "create") ? "Queued" : (initialData?.status as TaskFormValues['status']) || "Queued",
-      agent_type: initialData?.agent_type || "Unassigned",
+      agent_type: initialData?.agent_type || "Fullstack",
       dueDate: initialData?.due_date ? new Date(initialData.due_date).toISOString().split('T')[0] : "",
       topic: initialData?.topic || "",
       project: initialData?.project || "",
       repositories: initialData?.repos?.length
         ? initialData.repos
         : (mode === "create")
-          ? Object.keys(mockRepositories)
+          ? []
           : ["none"],
       tags: initialData?.tags || [],
-      runOnCreate: true,
+      runOnCreate: false, // "Add more tasks" is off by default
     },
   });
 
-  // Auto-select all repositories for new tasks
+  // Watch agent type to control repository selection behavior
+  const selectedAgentType = form.watch("agent_type");
+  const isFullstack = selectedAgentType === "Fullstack";
+
+  // Fetch repositories from the backend
+  const fetchRepos = async () => {
+    setIsLoadingRepos(true);
+    try {
+      const data = await fetchConnectedRepos();
+      // Convert array of repos to a record with ids
+      const reposRecord: Record<string, Repository> = {};
+      data.repos.forEach((repo: Repository, index: number) => {
+        const id = `repo-${index}`;
+        reposRecord[id] = repo;
+      });
+      setRepositories(reposRecord);
+    } catch (error) {
+      console.error("Error fetching repositories:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch repositories",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingRepos(false);
+    }
+  };
+
+    // Reset loading state and initialize when form opens
   useEffect(() => {
-    // Only auto-select repositories if we're creating a new task (not editing)
-    if (mode === "create") {
-      // Get all repository IDs
-      const allRepoIds = Object.keys(mockRepositories);
-      if (allRepoIds.length > 0) {
-        form.setValue("repositories", allRepoIds);
+    if (open) {
+      // Initialize default state for create mode
+      if (mode === "create") {
         setAllReposSelected(true);
       }
-    } else if (mode === "edit" && initialData?.repos?.length) {
+      // Fetch repositories when the form opens
+      fetchRepos();
+    }
+  }, [open, mode]);
+
+  // Auto-select all repositories when they are loaded
+  useEffect(() => {
+    // Only auto-select repositories if we're creating a new task (not editing)
+    if (mode === "create" && Object.keys(repositories).length > 0) {
+      if (isFullstack) {
+        // For Fullstack, select all repositories
+        const allRepoIds = Object.keys(repositories);
+        if (allRepoIds.length > 0) {
+          form.setValue("repositories", allRepoIds);
+          setAllReposSelected(true);
+        }
+      } else {
+        // For non-Fullstack, select only the first repository if available
+        const repoKeys = Object.keys(repositories);
+        if (repoKeys.length > 0) {
+          form.setValue("repositories", [repoKeys[0]]);
+          setAllReposSelected(false);
+        } else {
+          form.setValue("repositories", ["none"]);
+        }
+      }
+    } else if (mode === "edit" && initialData?.repos?.length && Object.keys(repositories).length > 0) {
       // Check if all repos are selected in edit mode
-      const allRepoIds = Object.keys(mockRepositories);
+      const allRepoIds = Object.keys(repositories);
       const selectedRepoIds = initialData.repos;
       setAllReposSelected(
         allRepoIds.length > 0 &&
@@ -366,7 +407,20 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
         allRepoIds.every(id => selectedRepoIds.includes(id))
       );
     }
-  }, [form, mode, initialData]);
+  }, [form, mode, initialData, repositories, isFullstack]);
+
+  // Update repositories when agent type changes
+  useEffect(() => {
+    if (!isFullstack) {
+      // For non-Fullstack, limit to a single repository
+      const currentRepos = form.getValues("repositories") || [];
+      if (currentRepos.length > 1) {
+        // Keep only the first selected repository
+        form.setValue("repositories", [currentRepos[0]]);
+        setAllReposSelected(false);
+      }
+    }
+  }, [isFullstack, form]);
 
   // Handle repository selection
   useEffect(() => {
@@ -397,14 +451,20 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
         setAllReposSelected(false);
       } else {
         // Add if not selected
-        newRepos = [...filteredRepos, repoId];
+        if (!isFullstack) {
+          // For non-Fullstack, replace the current selection with the new one
+          newRepos = [repoId];
+        } else {
+          // For Fullstack, add to the current selection
+          newRepos = [...filteredRepos, repoId];
 
-        // Check if all repos are now selected
-        const allRepoIds = Object.keys(mockRepositories);
-        setAllReposSelected(
-          allRepoIds.length > 0 &&
-          allRepoIds.every(id => newRepos.includes(id))
-        );
+          // Check if all repos are now selected
+          const allRepoIds = Object.keys(repositories);
+          setAllReposSelected(
+            allRepoIds.length > 0 &&
+            allRepoIds.every(id => newRepos.includes(id))
+          );
+        }
       }
 
       // If no repos selected, add "none"
@@ -473,26 +533,37 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       // Add task to local state
       addTask(newTask);
 
-      // Only run task with agent if runOnCreate is true
-      if (runOnCreate) {
-        const jobId = `task-${taskId}-${Date.now()}`;
-        await taskApi.runTask({
-          job_id: jobId,
-          payload: { task_id: taskId }
-        });
-
-        // Show toast notification for task processing
-        showProcessingToast(taskId);
-      }
-
       toast({
         title: "Success",
         description: "Task created successfully",
       });
 
-      // Always close the dialog after task creation
-      onOpenChange(false);
-      form.reset();
+      // Check if "Add more tasks" is selected
+      const addMoreTasks = runOnCreate;
+
+            if (addMoreTasks && mode === "create") {
+        // Just reset the form fields but keep the dialog open
+        form.reset({
+          ...form.getValues(),
+          title: "",
+          description: "",
+          runOnCreate: true, // Keep the "Add more tasks" option selected
+        });
+
+        toast({
+          title: "Task added",
+          description: "Ready to create another task",
+        });
+
+        // Focus on the title input after a short delay to ensure the form is reset
+        setTimeout(() => {
+          titleInputRef.current?.focus();
+        }, 50);
+      } else {
+        // Close the dialog if not adding more tasks
+        onOpenChange(false);
+        form.reset();
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -501,6 +572,31 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       });
     }
   };
+
+    // Add keyboard shortcuts for the form
+  useEffect(() => {
+    if (open) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        // Cmd+Enter to submit form
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+          e.preventDefault();
+          form.handleSubmit(onSubmit)();
+        }
+
+        // Cmd+L to toggle "Add more tasks" checkbox
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
+          e.preventDefault();
+          const currentValue = form.getValues().runOnCreate;
+          form.setValue('runOnCreate', !currentValue);
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [open, form, onSubmit]);
 
   // Get status dot color based on status value
   const getStatusDot = (status: string) => {
@@ -516,6 +612,15 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       default:
         return "queued-dot";
     }
+  };
+
+  // Format repository display name
+  const getRepoDisplayName = (id: string) => {
+    const repo = repositories[id];
+    if (repo) {
+      return `${repo.owner}/${repo.repo}`;
+    }
+    return "Unknown Repository";
   };
 
   return (
@@ -535,6 +640,7 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                     <Input
                       placeholder="Issue title"
                       {...field}
+                      ref={titleInputRef}
                       className="linear-input focus-visible:ring-0 text-lg font-medium placeholder:text-gray-400/60"
                     />
                   </FormControl>
@@ -636,11 +742,11 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                             >
                               <Github className="h-3.5 w-3.5 mr-0 opacity-70" />
                               <span className="text-sm">
-                                {field.value?.length === 0 || (field.value?.length === 1 && field.value[0] === "none")
+                                {isLoadingRepos ? "Loading repositories..." :
+                                  field.value?.length === 0 || (field.value?.length === 1 && field.value[0] === "none")
                                   ? (mode === "create" ? "All repositories" : "Repositories")
-                                  : allReposSelected || (
-                                    Object.keys(mockRepositories).length === field.value?.filter(r => r !== "none").length)
-                                    ? "All repositories"
+                                  : field.value?.filter(r => r !== "none").length === 1
+                                    ? getRepoDisplayName(field.value?.filter(r => r !== "none")[0])
                                     : `${field.value?.filter(r => r !== "none").length} repo${field.value?.filter(r => r !== "none").length > 1 ? 's' : ''}`}
                               </span>
                               <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
@@ -663,11 +769,11 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                                     <span>No repository</span>
                                   </CommandItem>
 
-                                  {Object.keys(mockRepositories).length > 0 && (
+                                  {form.getValues("agent_type") === "Fullstack" && Object.keys(repositories).length > 0 && (
                                     <CommandItem
                                       onSelect={() => {
                                         // Get all repository IDs
-                                        const allRepoIds = Object.keys(mockRepositories);
+                                        const allRepoIds = Object.keys(repositories);
                                         const currentRepos = form.getValues("repositories") || [];
 
                                         // If all repos are already selected, deselect all and select "none"
@@ -684,7 +790,7 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                                     >
                                       <Checkbox
                                         checked={
-                                          Object.keys(mockRepositories).every(id =>
+                                          Object.keys(repositories).every(id =>
                                             isRepositorySelected(id) && !isRepositorySelected("none")
                                           )
                                         }
@@ -694,7 +800,7 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                                     </CommandItem>
                                   )}
 
-                                  {Object.entries(mockRepositories).map(([id, repo]: [string, any]) => (
+                                  {Object.entries(repositories).map(([id, repo]) => (
                                     <CommandItem
                                       key={id}
                                       onSelect={() => handleRepositoryToggle(id)}
@@ -704,7 +810,7 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                                         checked={isRepositorySelected(id)}
                                         className="h-4 w-4 data-[state=checked]:bg-[#5e6ad2] data-[state=checked]:border-[#5e6ad2]"
                                       />
-                                      <span>{`${repo.organization}/${repo.repository_name}`}</span>
+                                      <span>{`${repo.owner}/${repo.repo}`}</span>
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
@@ -735,7 +841,7 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                       className="h-4 w-4 data-[state=checked]:bg-[#5e6ad2] data-[state=checked]:border-[#5e6ad2] border-gray-300"
                     />
                     <label htmlFor="run-ai" className="text-sm text-muted-foreground cursor-pointer">
-                      Auto-generate subtasks with AI
+                      Add more tasks <span className="ml-1 opacity-70 text-xs">⌘+L</span>
                     </label>
                   </div>
                 )}
@@ -745,7 +851,11 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                 type="submit"
                 className="bg-[#5e6ad2] hover:bg-[#5e6ad2]/90 text-white h-9 px-4 rounded-md"
               >
-                {mode === "create" ? "Create issue" : "Update issue"}
+                {mode === "create" ? (
+                  <>
+                    Create issue <span className="ml-1 opacity-70 text-xs">⌘+↵</span>
+                  </>
+                ) : "Update issue"}
               </Button>
             </div>
           </form>
