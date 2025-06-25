@@ -7,7 +7,8 @@ export const TaskStatusEnum = z.enum([
   'queued',
   'running',
   'done',
-  'failed'
+  'failed',
+  'waiting_for_input'
 ]);
 
 export type TaskStatus = z.infer<typeof TaskStatusEnum>;

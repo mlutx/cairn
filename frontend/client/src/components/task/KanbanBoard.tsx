@@ -97,7 +97,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
   };
 
   // Memoize filtered tasks to prevent unnecessary re-renders
-  const { projectTasks, queuedTasks, runningTasks, doneTasks, failedTasks, taskMap, childTaskMap } = useMemo(() => {
+  const { projectTasks, queuedTasks, runningTasks, doneTasks, failedTasks, waitingForInputTasks, taskMap, childTaskMap } = useMemo(() => {
     // Filter tasks by project if specified
     const filteredTasks = project
       ? tasks.filter(task => task.project === project)
@@ -141,6 +141,9 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     const failed = sortTasksByDueDate(
       getParentTasks(filteredTasks.filter((task: Task) => task.status === "Failed"))
     );
+    const waitingForInput = sortTasksByDueDate(
+      getParentTasks(filteredTasks.filter((task: Task) => task.status === "Waiting for Input"))
+    );
 
     return {
       projectTasks: filteredTasks,
@@ -148,6 +151,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
       runningTasks: running,
       doneTasks: done,
       failedTasks: failed,
+      waitingForInputTasks: waitingForInput,
       taskMap,
       childTaskMap
     };
@@ -273,7 +277,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-full">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 h-full">
         <KanbanColumn
           title="Queued"
           tasks={queuedTasks}
@@ -287,6 +291,13 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
           color="bg-yellow-500"
           status="Running"
           columnId="Running"
+        />
+        <KanbanColumn
+          title="Waiting for Input"
+          tasks={waitingForInputTasks}
+          color="bg-blue-500"
+          status="Waiting for Input"
+          columnId="Waiting for Input"
         />
         <KanbanColumn
           title="Done"

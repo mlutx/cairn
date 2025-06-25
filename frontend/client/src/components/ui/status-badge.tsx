@@ -8,7 +8,7 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className, compact = false }: StatusBadgeProps) {
-  // Updated config for sleek dark mode design with only four statuses
+  // Updated config for sleek dark mode design with five statuses
   const statusConfig: Record<string, {
     dotColor: string;
     label: string;
@@ -28,6 +28,10 @@ export function StatusBadge({ status, className, compact = false }: StatusBadgeP
     'Failed': {
       dotColor: 'bg-rose-400/90',
       label: 'Failed'
+    },
+    'Waiting for Input': {
+      dotColor: 'bg-blue-400/90',
+      label: 'Waiting for Input'
     }
   };
 

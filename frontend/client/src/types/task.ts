@@ -1,4 +1,4 @@
-export type TaskStatus = "Queued" | "Running" | "Done" | "Failed";
+export type TaskStatus = "Queued" | "Running" | "Done" | "Failed" | "Waiting for Input";
 export type AgentType = "Fullstack" | "PM" | "SWE" | "Unassigned";
 
 export interface Task {
