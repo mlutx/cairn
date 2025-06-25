@@ -46,6 +46,8 @@ export interface Task {
   project?: string;
   priority?: string;
   assignees?: string[];
+  model_provider?: string;
+  model_name?: string;
   // Parent-child relationship fields:
   // For PM tasks: parent_fullstack_id refers to parent Fullstack task
   parent_fullstack_id?: string;
@@ -75,6 +77,8 @@ export interface TaskFormData {
   dueDate?: Date | string;
   topic?: string;
   project?: string;
+  model_provider?: string;
+  model_name?: string;
 }
 
 export interface FilterOptions {

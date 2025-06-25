@@ -31,7 +31,7 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { ChevronDown, Github } from "lucide-react";
+import { ChevronDown, Github, Server } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTasks } from "@/contexts/TaskContext";
@@ -46,6 +46,15 @@ import {
 } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { fetchConnectedRepos } from "@/lib/api";
+import { fetchModels, ModelsResponse } from "@/lib/api/models";
+
+// Import logo images
+import openaiLogo from "@/assets/openai.png";
+import anthropicLogo from "@/assets/anthropic.png";
+import geminiLogo from "@/assets/gemini.png";
+import fullstackIcon from "@/assets/fullstack-icon.png";
+import pmIcon from "@/assets/pm-icon.png";
+import sweIcon from "@/assets/swe-icon.png";
 
 const customStyles = `
   /* Select item styles */
@@ -281,6 +290,8 @@ const taskFormSchema = z.object({
   repositories: z.array(z.string()).default([]),
   tags: z.array(z.string()).default([]),
   runOnCreate: z.boolean().default(true),
+  model_provider: z.string().optional(),
+  model_name: z.string().optional(),
 });
 
 type TaskFormValues = z.infer<typeof taskFormSchema>;
@@ -302,43 +313,73 @@ interface Repository {
 
 export default function TaskForm({ open, onOpenChange, initialData, mode = "create" }: TaskFormProps) {
   const { toast } = useToast();
-  const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
-  const { addTask } = useTasks();
+  const { addTask, updateTask } = useTasks();
   const { showProcessingToast } = useTaskProcessingToast();
+  const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [customTag, setCustomTag] = useState("");
   const [allReposSelected, setAllReposSelected] = useState(mode === "create");
   const [repositories, setRepositories] = useState<Record<string, Repository>>({});
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [modelProviders, setModelProviders] = useState<ModelsResponse["providers"]>({});
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  // Agent types
-  const agentTypes = ["Fullstack", "PM", "SWE", "Unassigned"];
+  // Define agent types
+  const agentTypes = ["Fullstack", "PM", "SWE"];
 
-  // Initialize form with default values
+  // Helper function to get the logo for a model provider
+  const getModelProviderLogo = (provider: string) => {
+    switch (provider.toLowerCase()) {
+      case "openai":
+        return openaiLogo;
+      case "anthropic":
+        return anthropicLogo;
+      case "gemini":
+        return geminiLogo;
+      default:
+        return null;
+    }
+  };
+
+  const getAgentTypeIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case "fullstack":
+        return fullstackIcon;
+      case "pm":
+        return pmIcon;
+      case "swe":
+        return sweIcon;
+      default:
+        return null;
+    }
+  };
+
+  // Get saved model provider and model from localStorage
+  const savedModelProvider = localStorage.getItem('lastModelProvider');
+  const savedModelName = localStorage.getItem('lastModelName');
+
+  // Form definition
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
       title: initialData?.title || "",
       description: initialData?.description || "",
-      status: (mode === "create") ? "Queued" : (initialData?.status as TaskFormValues['status']) || "Queued",
+      status: initialData?.status || "Queued",
       agent_type: initialData?.agent_type || "Fullstack",
-      dueDate: initialData?.due_date ? new Date(initialData.due_date).toISOString().split('T')[0] : "",
-      topic: initialData?.topic || "",
-      project: initialData?.project || "",
-      repositories: initialData?.repos?.length
-        ? initialData.repos
-        : (mode === "create")
-          ? []
-          : ["none"],
+      repositories: initialData?.repos || [],
+      model_provider: initialData?.model_provider || savedModelProvider || "",
+      model_name: initialData?.model_name || savedModelName || "",
       tags: initialData?.tags || [],
-      runOnCreate: false, // "Add more tasks" is off by default
+      due_date: initialData?.due_date ? new Date(initialData.due_date) : undefined,
+      runOnCreate: true,
     },
   });
 
   // Watch agent type to control repository selection behavior
-  const selectedAgentType = form.watch("agent_type");
-  const isFullstack = selectedAgentType === "Fullstack";
+  const selectedModelProvider = form.watch("model_provider");
+  const isFullstack = form.watch("agent_type") === "Fullstack";
 
   // Fetch repositories from the backend
   const fetchRepos = async () => {
@@ -364,7 +405,25 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
     }
   };
 
-    // Reset loading state and initialize when form opens
+  // Fetch model providers and models
+  const fetchModelProviders = async () => {
+    setIsLoadingModels(true);
+    try {
+      const data = await fetchModels();
+      setModelProviders(data.providers);
+    } catch (error) {
+      console.error("Error fetching model providers:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch model providers",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  // Reset loading state and initialize when form opens
   useEffect(() => {
     if (open) {
       // Initialize default state for create mode
@@ -373,8 +432,33 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       }
       // Fetch repositories when the form opens
       fetchRepos();
+      // Fetch model providers when the form opens
+      fetchModelProviders();
     }
   }, [open, mode]);
+
+  // Update available models when model provider changes
+  useEffect(() => {
+    if (selectedModelProvider && modelProviders[selectedModelProvider]) {
+      setSelectedModels(modelProviders[selectedModelProvider].models || []);
+    } else {
+      setSelectedModels([]);
+    }
+  }, [selectedModelProvider, modelProviders]);
+
+  // Save selected model provider and model to localStorage when they change
+  useEffect(() => {
+    const currentProvider = form.getValues("model_provider");
+    const currentModel = form.getValues("model_name");
+
+    if (currentProvider) {
+      localStorage.setItem('lastModelProvider', currentProvider);
+    }
+
+    if (currentModel) {
+      localStorage.setItem('lastModelName', currentModel);
+    }
+  }, [form.watch("model_provider"), form.watch("model_name")]);
 
   // Auto-select all repositories when they are loaded
   useEffect(() => {
@@ -487,11 +571,14 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
   const onSubmit = async (values: TaskFormValues) => {
     try {
       // Extract runOnCreate but don't include it in taskData
-      const { runOnCreate, repositories, ...taskDataValues } = values;
+      const { runOnCreate, repositories, model_provider, model_name, ...taskDataValues } = values;
       const taskData = {
         ...taskDataValues,
         // Filter out "none" from the repositories array
         repos: repositories?.filter(repo => repo !== "none") || [],
+        // Include model provider and model name if they exist
+        model_provider,
+        model_name,
       };
 
       if (mode === "edit" && initialData) {
@@ -528,6 +615,8 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
         repos: repositories?.filter(repo => repo !== "none") || [],
         created_by: "user-1",
         team: "team-1",
+        model_provider: values.model_provider,
+        model_name: values.model_name,
       };
 
       // Add task to local state
@@ -541,13 +630,16 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       // Check if "Add more tasks" is selected
       const addMoreTasks = runOnCreate;
 
-            if (addMoreTasks && mode === "create") {
+      if (addMoreTasks && mode === "create") {
         // Just reset the form fields but keep the dialog open
         form.reset({
           ...form.getValues(),
           title: "",
           description: "",
           runOnCreate: true, // Keep the "Add more tasks" option selected
+          // Keep the model provider and model name
+          model_provider: values.model_provider,
+          model_name: values.model_name,
         });
 
         toast({
@@ -573,7 +665,7 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
     }
   };
 
-    // Add keyboard shortcuts for the form
+  // Add keyboard shortcuts for the form
   useEffect(() => {
     if (open) {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -709,13 +801,35 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                         defaultValue={field.value}
                       >
                         <SelectTrigger className="linear-menu w-full justify-start">
-                          <SelectValue placeholder="Agent Type" />
+                          {field.value && getAgentTypeIcon(field.value) ? (
+                            <>
+                              <img
+                                src={getAgentTypeIcon(field.value)}
+                                alt={`${field.value} icon`}
+                                className="h-3.5 w-3.5 mr-1 object-contain"
+                              />
+                              <span>{field.value}</span>
+                            </>
+                          ) : (
+                            <SelectValue placeholder="Agent Type" />
+                          )}
                           <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
                         </SelectTrigger>
                         <SelectContent>
                           {agentTypes.map((type) => (
                             <SelectItem key={type} value={type}>
-                              {type}
+                              {getAgentTypeIcon(type) ? (
+                                <div className="flex items-center">
+                                  <img
+                                    src={getAgentTypeIcon(type)}
+                                    alt={`${type} icon`}
+                                    className="h-4 w-4 mr-2 object-contain"
+                                  />
+                                  {type}
+                                </div>
+                              ) : (
+                                type
+                              )}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -724,6 +838,115 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   </FormItem>
                 )}
               />
+
+              {/* Model Provider and Model Selection - Side by side */}
+              <div className="flex gap-2">
+                {/* Model Provider Selection */}
+                <FormField
+                  control={form.control}
+                  name="model_provider"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // Reset model name when provider changes
+                            form.setValue("model_name", "");
+                          }}
+                          value={field.value || ""}
+                        >
+                          <SelectTrigger className="linear-menu w-full justify-start">
+                            {field.value && getModelProviderLogo(field.value) ? (
+                              <>
+                                <img
+                                  src={getModelProviderLogo(field.value)}
+                                  alt={`${field.value} logo`}
+                                  className="h-3.5 w-3.5 mr-1 object-contain"
+                                />
+                                <span>{field.value}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Server className="h-3.5 w-3.5 mr-1 opacity-70" />
+                                <SelectValue placeholder="Select Model Provider" />
+                              </>
+                            )}
+                            <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isLoadingModels ? (
+                              <SelectItem value="loading" disabled>
+                                Loading providers...
+                              </SelectItem>
+                            ) : Object.keys(modelProviders).length === 0 ? (
+                              <SelectItem value="none" disabled>
+                                No providers available
+                              </SelectItem>
+                            ) : (
+                              Object.keys(modelProviders).map((provider) => (
+                                <SelectItem key={provider} value={provider}>
+                                  {getModelProviderLogo(provider) ? (
+                                    <div className="flex items-center">
+                                      <img
+                                        src={getModelProviderLogo(provider)}
+                                        alt={`${provider} logo`}
+                                        className="h-4 w-4 mr-2 object-contain"
+                                      />
+                                      {provider}
+                                    </div>
+                                  ) : (
+                                    provider
+                                  )}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Model Selection */}
+                <FormField
+                  control={form.control}
+                  name="model_name"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || ""}
+                          disabled={!selectedModelProvider}
+                        >
+                          <SelectTrigger className="linear-menu w-full justify-start">
+                            <SelectValue placeholder="Select Model" />
+                            <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {!selectedModelProvider ? (
+                              <SelectItem value="none" disabled>
+                                Select a provider first
+                              </SelectItem>
+                            ) : selectedModels.length === 0 ? (
+                              <SelectItem value="none" disabled>
+                                No models available
+                              </SelectItem>
+                            ) : (
+                              selectedModels.map((model) => (
+                                <SelectItem key={model} value={model}>
+                                  {model}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="additional-fields">
@@ -824,8 +1047,6 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   )}
                 />
               </div>
-
-
             </div>
 
             <div className="linear-footer">

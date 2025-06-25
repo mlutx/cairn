@@ -1,26 +1,27 @@
 export type TaskStatus = "Queued" | "Running" | "Done" | "Failed" | "Waiting for Input";
-export type AgentType = "Fullstack" | "PM" | "SWE" | "Unassigned";
+export type AgentType = "Fullstack" | "PM" | "SWE";
 
 export interface Task {
   id: string;
   title: string;
-  description?: string;
+  description: string;
   status: TaskStatus;
-  due_date?: string;
+  agent_type: AgentType;
+  project?: string;
   created_at: string;
   updated_at: string;
-  agent_type?: AgentType;
+  due_date?: string;
+  repos: string[];
   tags?: string[];
-  projects?: string[];
-  subtasks?: Task[];
-  comments?: Comment[];
+  topic?: string;
   created_by: string;
   team: string;
+  model_provider?: string;
+  model_name?: string;
   link?: string;
   explore_queued_at?: string;
   explore_done_at?: string;
   explore_result?: any;
-  repos?: string[];
   jobs?: string[];
   createdAt?: string;
   updatedAt?: string;
