@@ -24,6 +24,7 @@ import httpx
 # Add the parent directory to Python path so we can import cairn_utils
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from interactive_worker_manager import WorkerManager
+from cairn_utils.supported_models import SUPPORTED_MODELS
 
 # Load environment variables
 load_dotenv('.env')
@@ -80,6 +81,12 @@ cache = {
         "general_rules": [],
         "repo_specific_rules": {}
     },
+    "last_updated": 0
+}
+
+# Cache for model providers and models
+models_cache = {
+    "providers": {},
     "last_updated": 0
 }
 
@@ -164,6 +171,9 @@ async def lifespan(app: FastAPI):
 
     # Initialize cache
     refresh_cache()
+
+    # Initialize models cache
+    refresh_models_cache()
 
     # Start the background event loop in a separate thread
     background_thread = threading.Thread(target=run_background_loop, daemon=True)
@@ -1336,6 +1346,59 @@ async def refresh_repos_cache():
     return {
         "message": "Cache refreshed successfully",
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+def refresh_models_cache():
+    """Refresh the models cache with validated model providers and models"""
+    global models_cache
+
+    valid_providers = {}
+
+    # Check each provider's API key
+    for provider, info in SUPPORTED_MODELS.items():
+        env_key_name = info.get('env_api_key_name')
+
+        # If the provider has an API key requirement and it's set
+        if env_key_name and os.getenv(env_key_name):
+            # Include this provider and its models
+            valid_providers[provider] = {
+                "models": info["models"],
+                "has_valid_key": True
+            }
+        elif not env_key_name:
+            # If no API key is required, include the provider
+            valid_providers[provider] = {
+                "models": info["models"],
+                "has_valid_key": True
+            }
+        else:
+            # Provider requires an API key but it's not set
+            valid_providers[provider] = {
+                "models": info["models"],
+                "has_valid_key": False
+            }
+
+    models_cache["providers"] = valid_providers
+    models_cache["last_updated"] = time.time()
+    logger.info(f"Models cache refreshed at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+@app.get("/api/models")
+async def get_models():
+    """Get available model providers and models"""
+    # Check if we need to refresh the cache
+    if time.time() - models_cache["last_updated"] > 300:  # Refresh every 5 minutes
+        refresh_models_cache()
+
+    # Return only providers with valid API keys
+    valid_providers = {
+        provider: data
+        for provider, data in models_cache["providers"].items()
+        if data.get("has_valid_key", False)
+    }
+
+    return {
+        "providers": valid_providers,
+        "last_updated": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(models_cache["last_updated"]))
     }
 
 if __name__ == "__main__":

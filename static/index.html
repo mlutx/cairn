@@ -860,13 +860,14 @@
                 <div class="form-group">
                     <label for="model-provider">Model Provider</label>
                     <select id="model-provider" onchange="updateModelOptions()">
-                        <option value="anthropic">Anthropic</option>
-                        <option value="openai">OpenAI</option>
+                        <option value="">Loading providers...</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="model-name">Model</label>
-                    <select id="model-name"></select>
+                    <select id="model-name">
+                        <option value="">Select a provider first</option>
+                    </select>
                 </div>
             </div>
             <div id="repo-fields">
@@ -943,22 +944,8 @@
         let currentLogRunId = null; // Track which task's logs we're currently viewing
         let lastRenderedLogId = null; // Track the last log we rendered
 
-        // Add supported models configuration
-        const SUPPORTED_MODELS = {
-            "anthropic": [
-                "claude-sonnet-4-20250514",
-                "claude-3-7-sonnet-latest",
-                "claude-3-5-sonnet-latest",
-                "claude-3-5-haiku-latest"
-            ],
-            "openai": [
-                "gpt-4.1",
-                "gpt-4o-mini",
-                "gpt-4o",
-                "gpt-4",
-                "gpt-3.5-turbo"
-            ]
-        };
+        // Model providers and models will be fetched from the backend
+        let availableModels = {};
 
         function setLoading(isLoading) {
             document.body.classList.toggle('loading', isLoading);
@@ -1007,6 +994,9 @@
                 agentTypeSelect.innerHTML = config.available_agent_types.map(type => `<option value="${type}">${type}</option>`).join('');
                 updateRepoVisibility();
 
+                // Fetch available models
+                await fetchAvailableModels();
+
                 // Update status bar
                 const statusBar = document.getElementById('status-bar');
                 statusBar.innerHTML = `<a href="/repos" style="color: inherit; text-decoration: none;">Repository Manager <span style="font-size: 0.9em; opacity: 0.8;">(${config.connected_repos.length} repos)</span></a>`;
@@ -1032,6 +1022,33 @@
                 statusBar.style.right = '10px';
                 statusBar.style.margin = '0';
                 statusBar.style.borderRadius = '4px';
+            }
+        }
+
+        async function fetchAvailableModels() {
+            try {
+                const response = await fetch('/api/models');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+
+                // Store available models
+                availableModels = data.providers || {};
+
+                // Update model provider dropdown
+                modelProviderSelect.innerHTML = Object.keys(availableModels).map(
+                    provider => `<option value="${provider}">${provider.charAt(0).toUpperCase() + provider.slice(1)}</option>`
+                ).join('');
+
+                // Update model options based on the selected provider
+                updateModelOptions();
+            } catch (error) {
+                console.error("Failed to fetch available models:", error);
+                showAlert(`Failed to load models: ${error.message}`, 'error');
+
+                // Fallback to empty providers list
+                availableModels = {};
+                modelProviderSelect.innerHTML = '<option value="">No providers available</option>';
+                modelNameSelect.innerHTML = '<option value="">No models available</option>';
             }
         }
 
@@ -1165,6 +1182,16 @@
 
             if (!description) {
                 showAlert('Task description is required', 'error');
+                return;
+            }
+
+            if (!model_provider) {
+                showAlert('Please select a model provider', 'error');
+                return;
+            }
+
+            if (!model_name) {
+                showAlert('Please select a model', 'error');
                 return;
             }
 
@@ -2081,11 +2108,18 @@
         // Function to update model options based on selected provider
         window.updateModelOptions = () => {
             const provider = modelProviderSelect.value;
-            const models = SUPPORTED_MODELS[provider] || [];
+            const providerData = availableModels[provider] || { models: [] };
+            const models = providerData.models || [];
 
-            modelNameSelect.innerHTML = models.map(model =>
-                `<option value="${model}">${model}</option>`
-            ).join('');
+            if (models.length > 0) {
+                modelNameSelect.innerHTML = models.map(model =>
+                    `<option value="${model}">${model}</option>`
+                ).join('');
+                modelNameSelect.disabled = false;
+            } else {
+                modelNameSelect.innerHTML = '<option value="">No models available</option>';
+                modelNameSelect.disabled = true;
+            }
         };
 
         // Add event listeners to form fields to save state
