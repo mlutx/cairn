@@ -852,22 +852,30 @@
                     <select id="agent-type" onchange="updateRepoVisibility()"></select>
                 </div>
                 <div class="form-group">
-                    <label for="description">Task Description</label>
-                    <textarea id="description" placeholder="e.g., Implement a health check endpoint"></textarea>
+                    <label for="title">Title (optional)</label>
+                    <input type="text" id="title" placeholder="e.g., Add health check endpoint">
                 </div>
             </div>
             <div class="form-grid">
                 <div class="form-group">
-                    <label for="model-provider">Model Provider</label>
-                    <select id="model-provider" onchange="updateModelOptions()">
-                        <option value="">Loading providers...</option>
-                    </select>
+                    <label for="description">Task Description</label>
+                    <textarea id="description" placeholder="e.g., Implement a health check endpoint"></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="model-name">Model</label>
-                    <select id="model-name">
-                        <option value="">Select a provider first</option>
-                    </select>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="model-provider">Model Provider</label>
+                            <select id="model-provider" onchange="updateModelOptions()">
+                                <option value="">Loading providers...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="model-name">Model</label>
+                            <select id="model-name">
+                                <option value="">Select a provider first</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div id="repo-fields">
@@ -1094,6 +1102,7 @@
         // Store form state
         let formState = {
             description: '',
+            title: '',
             agentType: '',
             modelProvider: '',
             modelName: '',
@@ -1106,6 +1115,7 @@
         function saveFormState() {
             formState = {
                 description: descriptionInput.value,
+                title: document.getElementById('title').value,
                 agentType: agentTypeSelect.value,
                 modelProvider: modelProviderSelect.value,
                 modelName: modelNameSelect.value,
@@ -1118,6 +1128,7 @@
         // Function to restore form state
         function restoreFormState() {
             descriptionInput.value = formState.description;
+            document.getElementById('title').value = formState.title || '';
 
             // Restore agent type and update visibility
             if (formState.agentType) {
@@ -1160,6 +1171,7 @@
         window.resetForm = () => {
             formState = {
                 description: '',
+                title: '',
                 agentType: agentTypeSelect.options[0].value,
                 modelProvider: modelProviderSelect.options[0].value,
                 modelName: '',
@@ -1168,6 +1180,7 @@
                 branch: ''
             };
             descriptionInput.value = '';
+            document.getElementById('title').value = '';
             agentTypeSelect.selectedIndex = 0;
             modelProviderSelect.selectedIndex = 0;
             updateModelOptions(); // Reset model options
@@ -1179,6 +1192,7 @@
             const description = descriptionInput.value.trim();
             const model_provider = modelProviderSelect.value;
             const model_name = modelNameSelect.value;
+            const userTitle = document.getElementById('title').value.trim();
 
             if (!description) {
                 showAlert('Task description is required', 'error');
@@ -1198,8 +1212,12 @@
             // Save form state before proceeding
             saveFormState();
 
+            // Use user-provided title or generate one from the description
+            const title = userTitle || description.split('\n')[0].trim().substring(0, 50) + (description.length > 50 ? '...' : '');
+
             let payload = {
                 description,
+                title,
                 model_provider,
                 model_name
             };
@@ -1324,11 +1342,13 @@
 
         function renderTask(task, taskMap) {
             const payload = task.payload || {};
-            const { run_id, agent_type, agent_status, description, parent_run_id, parent_fullstack_id, model_provider, model_name } = payload;
+            const { run_id, agent_type, agent_status, description, title, parent_run_id, parent_fullstack_id, model_provider, model_name } = payload;
             const statusClass = `status-${(agent_status || 'unknown').toLowerCase()}`;
             const taskId = run_id || task.task_id;
             const displayId = taskId;
 
+            // Use title if available, otherwise use truncated description
+            const hasTitle = title && title.trim().length > 0;
             // Truncate description if longer than 200 characters
             const truncatedDesc = description && description.length > 200
                 ? description.substring(0, 200) + '...'
@@ -1566,6 +1586,7 @@
                         <div class="task-header-content">
                             <strong>${taskId}</strong> ${hasChildren ? `<span class="has-children-indicator">${childTasks.length} subtask${childTasks.length > 1 ? 's' : ''}</span>` : ''} (${agent_type || 'Unknown'})
                             ${model_provider && model_name ? `<span style="font-size: 11px; color: #8b949e;">🤖 ${model_provider} / ${model_name}</span>` : ''}
+                            ${hasTitle ? `<h3 style="margin-top: 5px; font-size: 16px; color: #e2e8f0;">${title}</h3>` : ''}
                             <p style="font-size: 12px; color: #6b7280;">${truncatedDesc}</p>
                             ${hasParent ? `<p style="font-size: 11px; color: #9ca3af;">↑ ${parentType} ${parentId}</p>` : ''}
                             ${prLinksHtml}

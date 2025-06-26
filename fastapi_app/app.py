@@ -349,6 +349,7 @@ class AgentPayload(BaseModel):
     """Payload model for agent tasks"""
     # Common fields
     description: str
+    title: Optional[str] = None
     model_provider: Optional[str] = None
     model_name: Optional[str] = None
 
@@ -674,6 +675,11 @@ async def kickoff_agent(request: KickoffAgentRequest):
         model_provider = request.payload.model_provider
         model_name = request.payload.model_name
 
+        # Get title from payload if provided, otherwise generate from description
+        title = request.payload.title
+        if not title:
+            title = description[:50] + ("..." if len(description) > 50 else "")
+
         task_id = worker_manager.create_task_sync(
             agent_type=request.agent_type,
             description=description,
@@ -685,6 +691,12 @@ async def kickoff_agent(request: KickoffAgentRequest):
         if not task_id:
             logger.error("WorkerManager.create_task_sync returned no task_id")
             raise HTTPException(status_code=500, detail="Failed to create task")
+
+        # Update the title in the payload if it was provided
+        if title:
+            task = worker_manager.get_task(task_id)
+            if task:
+                task["title"] = title
 
         logger.info(f"Successfully created task {task_id} using WorkerManager")
 
