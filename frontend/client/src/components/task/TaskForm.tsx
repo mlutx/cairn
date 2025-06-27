@@ -23,8 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
-import { Task, TaskFormData, TeamUser } from "@/types";
-import { AgentType, TaskStatus } from "@/types/task";
+import { TaskFormData, TeamUser } from "@/types";
+import { AgentType, Task, TaskStatus } from "@/types/task";
 import { useToast } from "@/components/ui/use-toast";
 import { taskApi } from "@/lib/api/task";
 import { useEffect, useRef, useState } from "react";
@@ -146,12 +146,12 @@ const customStyles = `
 
   /* Hide chevron icons in buttons */
   .linear-menu .select-chevron {
-    opacity: 0;
+    opacity: 0.5;
     transition: opacity 0.2s;
   }
 
   .linear-menu:hover .select-chevron {
-    opacity: 0.5;
+    opacity: 0.7;
   }
 
   /* Footer styling */
@@ -325,6 +325,10 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
   const [modelProviders, setModelProviders] = useState<ModelsResponse["providers"]>({});
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const [agentTypeOpen, setAgentTypeOpen] = useState(false);
+  const [modelProviderOpen, setModelProviderOpen] = useState(false);
+  const [modelNameOpen, setModelNameOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   // Define agent types
   const agentTypes = ["Fullstack", "PM", "SWE"];
@@ -614,7 +618,6 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
         description: values.description || "",
         status: "Queued" as TaskStatus, // Always set to Queued for new tasks
         agent_type: values.agent_type,
-        project: values.project || "",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         repos: repositories?.filter(repo => repo !== "none") || [],
@@ -773,22 +776,40 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <SelectTrigger className="linear-menu w-full justify-start">
-                            <span className={`status-dot ${getStatusDot(field.value)}`}></span>
-                            <SelectValue />
-                            <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Queued">Queued</SelectItem>
-                            <SelectItem value="Running">Running</SelectItem>
-                            <SelectItem value="Done">Done</SelectItem>
-                            <SelectItem value="Failed">Failed</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Popover open={statusOpen} onOpenChange={setStatusOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="linear-menu w-full flex justify-between"
+                            >
+                              <div className="flex items-center">
+                                <span className={`status-dot ${getStatusDot(field.value)}`}></span>
+                                <span>{field.value}</span>
+                              </div>
+                              <ChevronDown className="h-3 w-3 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[200px] p-0" align="start">
+                            <Command>
+                              <CommandList>
+                                <CommandGroup>
+                                  {["Queued", "Running", "Done", "Failed"].map((status) => (
+                                    <CommandItem
+                                      key={status}
+                                      onSelect={() => {
+                                        field.onChange(status);
+                                        setStatusOpen(false);
+                                      }}
+                                    >
+                                      <span className={`status-dot ${getStatusDot(status)}`}></span>
+                                      <span>{status}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </FormControl>
                     </FormItem>
                   )}
@@ -801,44 +822,60 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <SelectTrigger className="linear-menu w-full justify-start">
-                          {field.value && getAgentTypeIcon(field.value) ? (
-                            <>
-                              <img
-                                src={getAgentTypeIcon(field.value)}
-                                alt={`${field.value} icon`}
-                                className="h-3.5 w-3.5 mr-1 object-contain"
-                              />
-                              <span>{field.value}</span>
-                            </>
-                          ) : (
-                            <SelectValue placeholder="Agent Type" />
-                          )}
-                          <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {agentTypes.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {getAgentTypeIcon(type) ? (
-                                <div className="flex items-center">
+                      <Popover open={agentTypeOpen} onOpenChange={setAgentTypeOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="linear-menu w-full flex justify-between"
+                          >
+                            <div className="flex items-center">
+                              {field.value && getAgentTypeIcon(field.value) ? (
+                                <>
                                   <img
-                                    src={getAgentTypeIcon(type)}
-                                    alt={`${type} icon`}
-                                    className="h-4 w-4 mr-2 object-contain"
+                                    src={getAgentTypeIcon(field.value)}
+                                    alt={`${field.value} icon`}
+                                    className="h-3.5 w-3.5 mr-1 object-contain"
                                   />
-                                  {type}
-                                </div>
+                                  <span>{field.value}</span>
+                                </>
                               ) : (
-                                type
+                                <span>Select Agent Type</span>
                               )}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            </div>
+                            <ChevronDown className="h-3 w-3 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                          <Command>
+                            <CommandList>
+                              <CommandGroup>
+                                {agentTypes.map((type) => (
+                                  <CommandItem
+                                    key={type}
+                                    onSelect={() => {
+                                      field.onChange(type);
+                                      setAgentTypeOpen(false);
+                                    }}
+                                  >
+                                    {getAgentTypeIcon(type) ? (
+                                      <div className="flex items-center">
+                                        <img
+                                          src={getAgentTypeIcon(type)}
+                                          alt={`${type} icon`}
+                                          className="h-4 w-4 mr-2 object-contain"
+                                        />
+                                        <span>{type}</span>
+                                      </div>
+                                    ) : (
+                                      type
+                                    )}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </FormControl>
                   </FormItem>
                 )}
@@ -853,68 +890,80 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormControl>
-                        <Select
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            // Update available models and always clear the current model selection
-                            if (modelProviders[value]?.models) {
-                              setSelectedModels(modelProviders[value].models);
-                              // Clear the model selection when provider changes
-                              form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
-                            } else {
-                              setSelectedModels([]);
-                              form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
-                            }
-                          }}
-                          value={field.value || ""}
-                        >
-                          <SelectTrigger className="linear-menu w-full justify-start">
-                            {field.value && getModelProviderLogo(field.value) ? (
-                              <>
-                                <img
-                                  src={getModelProviderLogo(field.value)}
-                                  alt={`${field.value} logo`}
-                                  className="h-3.5 w-3.5 mr-1 object-contain"
-                                />
-                                <span>{field.value}</span>
-                              </>
-                            ) : (
-                              <>
-                                <Server className="h-3.5 w-3.5 mr-1 opacity-70" />
-                                <SelectValue placeholder="Select Model Provider" />
-                              </>
-                            )}
-                            <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {isLoadingModels ? (
-                              <SelectItem value="loading" disabled>
-                                Loading providers...
-                              </SelectItem>
-                            ) : Object.keys(modelProviders).length === 0 ? (
-                              <SelectItem value="none" disabled>
-                                No providers available
-                              </SelectItem>
-                            ) : (
-                              Object.keys(modelProviders).map((provider) => (
-                                <SelectItem key={provider} value={provider}>
-                                  {getModelProviderLogo(provider) ? (
-                                    <div className="flex items-center">
-                                      <img
-                                        src={getModelProviderLogo(provider)}
-                                        alt={`${provider} logo`}
-                                        className="h-4 w-4 mr-2 object-contain"
-                                      />
-                                      {provider}
-                                    </div>
+                        <Popover open={modelProviderOpen} onOpenChange={setModelProviderOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="linear-menu w-full flex justify-between"
+                            >
+                              <div className="flex items-center">
+                                {field.value && getModelProviderLogo(field.value) ? (
+                                  <>
+                                    <img
+                                      src={getModelProviderLogo(field.value)}
+                                      alt={`${field.value} logo`}
+                                      className="h-3.5 w-3.5 mr-1 object-contain"
+                                    />
+                                    <span>{field.value}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Server className="h-3.5 w-3.5 mr-1 opacity-70" />
+                                    <span>Select Provider</span>
+                                  </>
+                                )}
+                              </div>
+                              <ChevronDown className="h-3 w-3 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[200px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search providers..." />
+                              <CommandList>
+                                <CommandEmpty>No providers found.</CommandEmpty>
+                                <CommandGroup>
+                                  {isLoadingModels ? (
+                                    <CommandItem disabled>Loading providers...</CommandItem>
+                                  ) : Object.keys(modelProviders).length === 0 ? (
+                                    <CommandItem disabled>No providers available</CommandItem>
                                   ) : (
-                                    provider
+                                    Object.keys(modelProviders).map((provider) => (
+                                      <CommandItem
+                                        key={provider}
+                                        onSelect={() => {
+                                          field.onChange(provider);
+                                          // Update available models and always clear the current model selection
+                                          if (modelProviders[provider]?.models) {
+                                            setSelectedModels(modelProviders[provider].models);
+                                            // Clear the model selection when provider changes
+                                            form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
+                                          } else {
+                                            setSelectedModels([]);
+                                            form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
+                                          }
+                                          setModelProviderOpen(false);
+                                        }}
+                                      >
+                                        {getModelProviderLogo(provider) ? (
+                                          <div className="flex items-center">
+                                            <img
+                                              src={getModelProviderLogo(provider)}
+                                              alt={`${provider} logo`}
+                                              className="h-4 w-4 mr-2 object-contain"
+                                            />
+                                            <span>{provider}</span>
+                                          </div>
+                                        ) : (
+                                          provider
+                                        )}
+                                      </CommandItem>
+                                    ))
                                   )}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </FormControl>
                     </FormItem>
                   )}
@@ -927,37 +976,51 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormControl>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value || ""}
-                          disabled={!selectedModelProvider}
-                        >
-                          <SelectTrigger className="linear-menu w-full justify-start">
-                            {field.value ? (
-                              <span>{field.value}</span>
-                            ) : (
-                              <SelectValue placeholder={selectedModelProvider ? "Select Model" : "Select provider first"} />
-                            )}
-                            <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {!selectedModelProvider ? (
-                              <SelectItem value="none" disabled>
-                                Select a provider first
-                              </SelectItem>
-                            ) : selectedModels.length === 0 ? (
-                              <SelectItem value="none" disabled>
-                                No models available
-                              </SelectItem>
-                            ) : (
-                              selectedModels.map((model) => (
-                                <SelectItem key={model} value={model}>
-                                  {model}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
+                        <Popover open={modelNameOpen} onOpenChange={setModelNameOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="linear-menu w-full flex justify-between"
+                              disabled={!selectedModelProvider}
+                            >
+                              <div className="flex items-center">
+                                {field.value ? (
+                                  <span>{field.value}</span>
+                                ) : (
+                                  <span>{selectedModelProvider ? "Select Model" : "Select provider first"}</span>
+                                )}
+                              </div>
+                              <ChevronDown className="h-3 w-3 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[200px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search models..." />
+                              <CommandList>
+                                <CommandEmpty>No models found.</CommandEmpty>
+                                <CommandGroup>
+                                  {!selectedModelProvider ? (
+                                    <CommandItem disabled>Select a provider first</CommandItem>
+                                  ) : selectedModels.length === 0 ? (
+                                    <CommandItem disabled>No models available</CommandItem>
+                                  ) : (
+                                    selectedModels.map((model) => (
+                                      <CommandItem
+                                        key={model}
+                                        onSelect={() => {
+                                          field.onChange(model);
+                                          setModelNameOpen(false);
+                                        }}
+                                      >
+                                        {model}
+                                      </CommandItem>
+                                    ))
+                                  )}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </FormControl>
                     </FormItem>
                   )}
@@ -977,18 +1040,20 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                           <PopoverTrigger asChild>
                             <Button
                               variant="ghost"
-                              className="linear-menu w-full justify-start"
+                              className="linear-menu w-full flex justify-between"
                             >
-                              <Github className="h-3.5 w-3.5 mr-0 opacity-70" />
-                              <span className="text-sm">
-                                {isLoadingRepos ? "Loading repositories..." :
-                                  field.value?.length === 0 || (field.value?.length === 1 && field.value[0] === "none")
-                                  ? (mode === "create" ? "All repositories" : "Repositories")
-                                  : field.value?.filter(r => r !== "none").length === 1
-                                    ? getRepoDisplayName(field.value?.filter(r => r !== "none")[0])
-                                    : `${field.value?.filter(r => r !== "none").length} repo${field.value?.filter(r => r !== "none").length > 1 ? 's' : ''}`}
-                              </span>
-                              <ChevronDown className="h-3 w-3 ml-auto select-chevron" />
+                              <div className="flex items-center">
+                                <Github className="h-3.5 w-3.5 mr-1 opacity-70" />
+                                <span className="text-sm">
+                                  {isLoadingRepos ? "Loading repositories..." :
+                                    field.value?.length === 0 || (field.value?.length === 1 && field.value[0] === "none")
+                                    ? (mode === "create" ? "All repositories" : "Repositories")
+                                    : field.value?.filter(r => r !== "none").length === 1
+                                      ? getRepoDisplayName(field.value?.filter(r => r !== "none")[0])
+                                      : `${field.value?.filter(r => r !== "none").length} repo${field.value?.filter(r => r !== "none").length > 1 ? 's' : ''}`}
+                                </span>
+                              </div>
+                              <ChevronDown className="h-3 w-3 opacity-50" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[220px] p-0" align="start">

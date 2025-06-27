@@ -16,6 +16,7 @@ import sweAvatar from "@/assets/swe-icon.png";
 import pmAvatar from "@/assets/pm-icon.png";
 import fullstackAvatar from "@/assets/fullstack-icon.png";
 import { GitBranch } from "lucide-react";
+import TaskLogsDialog from "./TaskLogsDialog";
 
 interface TaskCardProps {
   task: Task;
@@ -125,21 +126,23 @@ export default function TaskCard({ task, onClick, className, expansionControl }:
       <div className="flex items-start justify-between">
         <h3 className="font-medium text-sm">{task.title}</h3>
         <div className="flex items-center gap-2">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild onClick={handleDialogClick}>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                🪵 View Logs
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Watch your agent cook 🔥</DialogTitle>
-              </DialogHeader>
-              <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
-                <pre className="text-xs text-slate-100">{JSON.stringify(mockLogs, null, 2)}</pre>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            title="View Logs"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDialogOpen(true);
+            }}
+          >
+            <span className="text-xs">🪵</span>
+          </Button>
+          <TaskLogsDialog
+            open={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            task={task}
+          />
         </div>
       </div>
       <div className="flex items-start justify-between">

@@ -102,8 +102,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
   const [selectedTask, setSelectedTask] = useState<Task | undefined>(undefined);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(false);
-  const [logsDialogOpen, setLogsDialogOpen] = useState(false);
-  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
+  // Removed logs dialog state as it's now handled in TaskCard component
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
   const [currentSubtaskIndex, setCurrentSubtaskIndex] = useState<number | null>(null);
@@ -219,13 +218,25 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     // Create a map of child tasks by their parent IDs
     const childTaskMap = new Map<string, Task[]>();
     filteredTasks.forEach(task => {
-      // Check for parent relationship
-      if (task.parent_run_id || task.parent_fullstack_id) {
-        const parentId = task.parent_run_id || task.parent_fullstack_id;
+      // Check for parent relationship - either parent_fullstack_id or parent_run_id
+      if (task.parent_fullstack_id || task.parent_run_id) {
+        const parentId = task.parent_fullstack_id || task.parent_run_id;
         if (parentId) {
           const children = childTaskMap.get(parentId) || [];
           children.push(task);
           childTaskMap.set(parentId, children);
+        }
+
+        // For SWE tasks with parent_run_id (which is a PM task), also add them as children of the parent's parent (Fullstack task)
+        if (task.parent_run_id) {
+          const pmTask = taskMap.get(task.parent_run_id);
+          if (pmTask && pmTask.parent_fullstack_id) {
+            // This is a SWE task under a PM task under a Fullstack task
+            // Add it as a direct child of the PM task, which we've done above
+
+            // We don't need to add it as a direct child of the Fullstack task
+            // because it will be shown nested under the PM task
+          }
         }
       }
     });
@@ -345,11 +356,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     setIsTaskFormOpen(true);
   };
 
-  // Handle view logs click
-  const handleViewLogsClick = (columnId: string) => {
-    setSelectedColumnId(columnId);
-    setLogsDialogOpen(true);
-  };
+  // This function is no longer used as logs are handled in TaskCard component
 
   // Render a virtual subtask card
   const renderVirtualSubtaskCard = (subtask: VirtualSubtask) => {
@@ -357,27 +364,45 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
                                currentSubtaskIndex === subtask.index &&
                                currentParentTaskId === subtask.parentTaskId;
 
+    // Create a virtual task object that looks like a real Task
+    const virtualTask: Partial<Task> = {
+      id: subtask.id,
+      title: subtask.title,
+      description: subtask.description,
+      status: "Queued", // Virtual tasks are always in "Queued" state
+      repos: [subtask.repo],
+      agent_type: subtask.assignment === "agent" ? "PM" : "SWE",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: "system"
+    };
+
+    // Create a custom expansion control component that includes our play button
+    const customExpansionControl = (
+      <Button
+        size="icon"
+        variant="outline"
+        className="h-6 w-6 text-xs mr-2 border border-blue-500 hover:bg-blue-500/10"
+        onClick={(e) => {
+          e.stopPropagation();
+          createSubtask(subtask.parentTaskId, subtask.index);
+        }}
+        disabled={isCurrentlyCreating}
+        title="Run Task"
+      >
+        {isCurrentlyCreating ?
+          <span className="animate-spin">⟳</span> :
+          <span className="text-blue-500">▶</span>}
+      </Button>
+    );
+
     return (
-      <div key={subtask.id} className="pl-4 mt-2 border-l-2 border-slate-600 bg-slate-800/30 p-3 rounded-md">
-        <div className="flex justify-between items-start">
-          <div>
-            <h4 className="text-sm font-medium">{subtask.title}</h4>
-            <p className="text-xs text-muted-foreground mt-1">{subtask.description}</p>
-            <div className="flex gap-2 mt-2">
-              <span className="text-xs px-2 py-1 bg-slate-700 rounded-full">{subtask.difficulty}</span>
-              <span className="text-xs px-2 py-1 bg-slate-700 rounded-full">{subtask.assignment}</span>
-              <span className="text-xs px-2 py-1 bg-slate-700 rounded-full">{subtask.repo}</span>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => createSubtask(subtask.parentTaskId, subtask.index)}
-            disabled={isCurrentlyCreating}
-          >
-            {isCurrentlyCreating ? "Creating..." : "Create Task"}
-          </Button>
-        </div>
+      <div key={subtask.id} className="relative">
+        <TaskCard
+          task={virtualTask as Task}
+          onClick={() => {}} // No action on click for virtual tasks
+          expansionControl={customExpansionControl}
+        />
       </div>
     );
   };
@@ -392,8 +417,8 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     const hasVirtualSubtasks = virtualSubtasks.length > 0;
     const shouldShowExpansionControl = hasChildren || hasChildTasks || hasVirtualSubtasks || hasSubtasksInOutput(task);
 
-    // Create expansion control if task has children or subtasks
-    const expansionControl = shouldShowExpansionControl ? (
+        // Create expansion control if task has children or subtasks
+    const controls = shouldShowExpansionControl ? (
       <Button
         variant="ghost"
         size="icon"
@@ -407,47 +432,69 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
       </Button>
     ) : null;
 
+    // Function to recursively render nested child tasks
+    const renderNestedChildTasks = (childTask: Task, level: number) => {
+      const nestedChildren = childTaskMap.get(childTask.id) || [];
+      const isSubtask = childTask.parent_fullstack_id === task.id || childTask.parent_run_id === task.id;
+      const canRun = isSubtask && childTask.status !== "Running" && childTask.status !== "Done";
+
+      return (
+        <div key={childTask.id} className="relative">
+          <div className={`pl-${level * 4} mt-2`}>
+            <TaskCard
+              task={childTask}
+              onClick={() => handleTaskClick(childTask)}
+              expansionControl={nestedChildren.length > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTaskExpansion(childTask.id);
+                  }}
+                >
+                  {expandedTasks.has(childTask.id) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                </Button>
+              ) : null}
+            />
+            {canRun && (
+              <div className="absolute top-2 right-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runSubtask(childTask.id);
+                  }}
+                >
+                  Run Task
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Render this child's children if expanded */}
+          {expandedTasks.has(childTask.id) && nestedChildren.map(nestedChild =>
+            renderNestedChildTasks(nestedChild, level + 1)
+          )}
+        </div>
+      );
+    };
+
     return (
       <div key={task.id} className="transition-all duration-300 ease-in-out">
         <TaskCard
           task={task}
           onClick={() => handleTaskClick(task)}
-          expansionControl={expansionControl}
+          expansionControl={controls}
         />
 
         {/* Show child tasks and virtual subtasks when expanded */}
         {isExpanded && (
           <div className="pl-4 mt-2 border-l-2 border-slate-600 space-y-2">
-            {/* Render real child tasks */}
-            {childTasks.map((childTask: Task) => {
-              // For child tasks that were created from subtasks, add a "Run" button if they're not running/completed
-              const isSubtask = childTask.parent_fullstack_id === task.id;
-              const canRun = isSubtask && childTask.status !== "Running" && childTask.status !== "Done";
-
-              return (
-                <div key={childTask.id} className="relative">
-                  <TaskCard
-                    task={childTask}
-                    onClick={() => handleTaskClick(childTask)}
-                    expansionControl={null}
-                  />
-                  {canRun && (
-                    <div className="absolute top-2 right-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          runSubtask(childTask.id);
-                        }}
-                      >
-                        Run Task
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {/* Render real child tasks with proper nesting */}
+            {childTasks.map((childTask: Task) => renderNestedChildTasks(childTask, 1))}
 
             {/* Render virtual subtasks from agent output */}
             {hasVirtualSubtasks && virtualSubtasks.map(renderVirtualSubtaskCard)}
@@ -554,19 +601,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
         />
       </div>
 
-      {/* Task Logs Dialog */}
-      <Dialog open={logsDialogOpen} onOpenChange={setLogsDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              Watch your agent cook 🔥
-            </DialogTitle>
-          </DialogHeader>
-          <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
-            <pre className="text-xs text-slate-100">{JSON.stringify(mockLogs, null, 2)}</pre>
-          </div>
-        </DialogContent>
-      </Dialog>
+            {/* Task Logs Dialog is now handled in TaskCard component */}
 
       {/* Task Details Sidebar */}
       {selectedTask && (

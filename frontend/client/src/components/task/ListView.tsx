@@ -51,6 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import TaskLogsDialog from "./TaskLogsDialog";
 import { taskApi } from "@/lib/api/task";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTasks } from "@/contexts/TaskContext";
@@ -886,18 +887,11 @@ export default function ListView({ project = "" }: ListViewProps) {
       </AlertDialog>
 
       {/* Task Logs Dialog */}
-      <Dialog open={logsDialogOpen} onOpenChange={setLogsDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              Watch your agent cook 🔥
-            </DialogTitle>
-          </DialogHeader>
-          <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
-            <pre className="text-xs text-slate-100">{JSON.stringify(mockLogs, null, 2)}</pre>
-          </div>
-        </DialogContent>
-      </Dialog>
+            <TaskLogsDialog
+        open={logsDialogOpen}
+        onOpenChange={setLogsDialogOpen}
+        task={selectedTaskForLogs}
+      />
     </>
   );
 }
