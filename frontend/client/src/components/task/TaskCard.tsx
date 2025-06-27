@@ -120,7 +120,7 @@ export default function TaskCard({ task, onClick, className, expansionControl }:
 
   return (
     <div
-      className={`p-2 bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition-shadow cursor-pointer space-y-1 ${className || ''}`}
+      className={`p-2 bg-card rounded-lg shadow-sm border border-border hover:shadow-md hover:border-primary/50 transition-all cursor-pointer space-y-1 ${className || ''}`}
       onClick={onClick}
     >
       <div className="flex items-start justify-between">
