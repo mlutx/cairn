@@ -1,0 +1,15 @@
+{
+  "tool_calls": [
+    {
+      "id": "toolu_019NejpLFpajSroAUwHWqqs2",
+      "name": "substring_search",
+      "input": {
+        "query": "info.py"
+      },
+      "type": "tool_use",
+      "server_executed": false
+    }
+  ],
+  "tool_results": {},
+  "text_content": ""
+}

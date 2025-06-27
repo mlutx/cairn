@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TaskLogsDialogProps {
   open: boolean;
@@ -25,6 +26,7 @@ export default function TaskLogsDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("logs");
 
   // Fetch logs when dialog opens or task changes
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function TaskLogsDialog({
     };
 
     // Initial fetch
-    if (open && task?.id) {
+    if (open && task?.id && activeTab === "logs") {
       fetchLogs();
 
       // Set up auto-refresh every 2 seconds
@@ -68,6 +70,13 @@ export default function TaskLogsDialog({
         window.clearInterval(intervalId);
       }
     };
+  }, [open, task?.id, activeTab]);
+
+  // Reset to logs tab when opening a new task
+  useEffect(() => {
+    if (open) {
+      setActiveTab("logs");
+    }
   }, [open, task?.id]);
 
   return (
@@ -76,45 +85,69 @@ export default function TaskLogsDialog({
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
             <span>{title}</span>
-            {lastUpdated && (
+            {lastUpdated && activeTab === "logs" && (
               <span className="text-xs text-muted-foreground">
                 Last updated: {lastUpdated.toLocaleTimeString()}
               </span>
             )}
           </DialogTitle>
         </DialogHeader>
-        <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
-          {isLoading && logs.length === 0 ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-3/4 bg-slate-800" />
-              <Skeleton className="h-4 w-full bg-slate-800" />
-              <Skeleton className="h-4 w-1/2 bg-slate-800" />
-            </div>
-          ) : error ? (
-            <div className="text-red-400 text-sm">
-              {error}
-            </div>
-          ) : logs.length === 0 ? (
-            <div className="text-slate-400 text-sm">
-              No logs found for this task yet.
-            </div>
-          ) : (
-            <pre className="text-xs text-slate-100 whitespace-pre-wrap">
-              {logs.map((log, index) => (
-                <div key={index} className="mb-2">
-                  <strong className="text-blue-300">
-                    [{new Date(log.created_at).toLocaleString()}] {log.agent_type}:
-                  </strong>
-                  <div className="pl-2 mt-1">
-                    {typeof log.log_data === 'object'
-                      ? JSON.stringify(log.log_data, null, 2)
-                      : String(log.log_data)}
-                  </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-2 mb-4">
+            <TabsTrigger value="logs">Logs</TabsTrigger>
+            <TabsTrigger value="details">Task Details</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="logs" className="mt-0">
+            <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
+              {isLoading && logs.length === 0 ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-3/4 bg-slate-800" />
+                  <Skeleton className="h-4 w-full bg-slate-800" />
+                  <Skeleton className="h-4 w-1/2 bg-slate-800" />
                 </div>
-              ))}
-            </pre>
-          )}
-        </div>
+              ) : error ? (
+                <div className="text-red-400 text-sm">
+                  {error}
+                </div>
+              ) : logs.length === 0 ? (
+                <div className="text-slate-400 text-sm">
+                  No logs found for this task yet.
+                </div>
+              ) : (
+                <pre className="text-xs text-slate-100 whitespace-pre-wrap">
+                  {logs.map((log, index) => (
+                    <div key={index} className="mb-2">
+                      <strong className="text-blue-300">
+                        [{new Date(log.created_at).toLocaleString()}] {log.agent_type}:
+                      </strong>
+                      <div className="pl-2 mt-1">
+                        {typeof log.log_data === 'object'
+                          ? JSON.stringify(log.log_data, null, 2)
+                          : String(log.log_data)}
+                      </div>
+                    </div>
+                  ))}
+                </pre>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="details" className="mt-0">
+            <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
+              {task ? (
+                <pre className="text-xs text-slate-100 whitespace-pre-wrap">
+                  {JSON.stringify(task, null, 2)}
+                </pre>
+              ) : (
+                <div className="text-slate-400 text-sm">
+                  No task details available.
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

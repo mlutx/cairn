@@ -570,97 +570,115 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
 
   const onSubmit = async (values: TaskFormValues) => {
     try {
-      // Check if provider is selected but no models available
-      if (values.model_provider && !values.model_name && modelProviders[values.model_provider]?.models?.length === 0) {
-        toast({
-          title: "Error",
-          description: `No models available for ${values.model_provider}. Please select a different provider.`,
-          variant: "destructive",
-        });
-        return;
-      }
-      // Extract runOnCreate but don't include it in taskData
-      const { runOnCreate, repositories, model_provider, model_name, ...taskDataValues } = values;
-      const taskData = {
-        ...taskDataValues,
-        // Filter out "none" from the repositories array
-        repos: repositories?.filter(repo => repo !== "none") || [],
-        // Include model provider and model name if they exist
-        model_provider,
-        model_name,
+      // Map agent_type to API expected value
+      let apiAgentType: "Fullstack" | "Fullstack Planner" | "PM" | "SWE" = values.agent_type;
+      if (apiAgentType === "Fullstack") apiAgentType = "Fullstack Planner" as any; // API expects this string
+
+      // Map repositories to owner/repo strings
+      const selectedRepoIds: string[] = values.repositories?.filter((r: string) => r !== "none") || [];
+      const repoStrings: string[] = selectedRepoIds.map((id: string) => {
+        const repo = repositories[id];
+        return repo ? `${repo.owner}/${repo.repo}` : id;
+      });
+
+      // Build payload
+      const payload: Record<string, any> = {
+        description: values.description || "",
+        title: values.title,
+        model_provider: values.model_provider,
+        model_name: values.model_name,
       };
 
-      if (mode === "edit" && initialData) {
-        // Update existing task
-        const response = await taskApi.updateTask(initialData.id, taskData);
-        toast({
-          title: "Success",
-          description: "Task updated successfully",
-        });
-        onOpenChange(false);
-        return;
+      if (apiAgentType === "Fullstack Planner") {
+        payload.repos = repoStrings;
+        if (!payload.repos.length) {
+          toast({
+            title: "Error",
+            description: "At least one repository is required for Fullstack Planner",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        // PM or SWE: only one repo allowed
+        payload.repo = repoStrings[0] || "";
+        // Optionally add branch if you have a branch field in the form (not present in current form)
+        // payload.branch = values.branch || undefined;
+        if (!payload.repo) {
+          toast({
+            title: "Error",
+            description: "A repository is required for this agent type",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
-      // Create task - always set status to Queued for new tasks
-      const taskDataWithQueuedStatus = {
-        ...taskData,
-        status: "Queued" as TaskStatus
-      };
-
-      const response = await taskApi.createTask(taskDataWithQueuedStatus);
-      const taskId = response.task?.id || `task-${Date.now()}`;
-      setCreatedTaskId(taskId);
+      // Generate a temporary ID for the task
+      const tempTaskId = `task-${Date.now()}`;
 
       // Create a local task object to add to state immediately
       const newTask: Task = {
-        id: taskId,
+        id: tempTaskId,
         title: values.title,
         description: values.description || "",
         status: "Queued" as TaskStatus, // Always set to Queued for new tasks
-        agent_type: values.agent_type,
+        agent_type: values.agent_type as AgentType,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        repos: repositories?.filter(repo => repo !== "none") || [],
+        repos: selectedRepoIds.filter(id => id !== "none"),
         created_by: "user-1",
         team: "team-1",
         model_provider: values.model_provider,
         model_name: values.model_name,
       };
 
-      // Add task to local state
+      // Add task to local state immediately
       addTask(newTask);
 
-      toast({
-        title: "Success",
-        description: "Task created successfully",
+      // Send POST request to /kickoff-agent
+      const apiResponse = await fetch("http://localhost:8000/kickoff-agent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          agent_type: apiAgentType,
+          payload,
+        }),
+        credentials: "include" // Include cookies if needed
       });
 
-      // Check if "Add more tasks" is selected
-      const addMoreTasks = runOnCreate;
+      if (!apiResponse.ok) {
+        let errorData: { detail?: string } = {};
+        try {
+          errorData = await apiResponse.json();
+        } catch {}
+        throw new Error(errorData.detail || "Failed to create task");
+      }
 
-      if (addMoreTasks && mode === "create") {
-        // Just reset the form fields but keep the dialog open
+      const apiResult: { message?: string } = await apiResponse.json();
+      toast({
+        title: "Success",
+        description: apiResult.message || "Task created successfully",
+      });
+
+      // Optionally: trigger a refresh of tasks here if you have a context or callback
+      // Close or reset the form
+      if (values.runOnCreate && mode === "create") {
         form.reset({
           ...form.getValues(),
           title: "",
           description: "",
-          runOnCreate: true, // Keep the "Add more tasks" option selected
-          // Keep the model provider and model name
+          runOnCreate: true,
           model_provider: values.model_provider,
           model_name: values.model_name,
         });
-
-        toast({
-          title: "Task added",
-          description: "Ready to create another task",
-        });
-
-        // Focus on the title input after a short delay to ensure the form is reset
         setTimeout(() => {
           titleInputRef.current?.focus();
         }, 50);
       } else {
-        // Close the dialog if not adding more tasks
         onOpenChange(false);
         form.reset();
       }
