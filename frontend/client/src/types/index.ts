@@ -28,22 +28,19 @@ export interface Task {
   updated_at: string;
   agent_type?: AgentType;
   tags?: string[];
-  projects?: string[];
   subtasks?: Task[];
   comments?: TaskComment[];
   created_by: string;
-  team: string;
   link?: string;
   explore_queued_at?: string;
   explore_done_at?: string;
   explore_result?: any;
-  repos?: string[];
+  repos: string[];
   jobs?: string[];
   createdAt?: string;
   updatedAt?: string;
   dueDate?: string;
   topic?: string;
-  project?: string;
   priority?: string;
   assignees?: string[];
   model_provider?: string;
@@ -76,7 +73,7 @@ export interface TaskFormData {
   agent_type?: AgentType;
   dueDate?: Date | string;
   topic?: string;
-  project?: string;
+  repos?: string[];
   model_provider?: string;
   model_name?: string;
 }
@@ -85,7 +82,7 @@ export interface FilterOptions {
   status?: TaskStatus | 'all';
   agent_type?: AgentType | 'all';
   topic?: string | 'all';
-  project?: string | 'all';
+  repo?: string | 'all';
   searchQuery?: string;
   sortBy?: 'created_at' | 'updated_at' | 'due_date' | 'title' | 'status' | 'agent_type';
   sortOrder?: 'asc' | 'desc';

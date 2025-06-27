@@ -30,7 +30,7 @@ try:
     )
     from .swe import SoftwareEngineerAgent
     from .thought_logger import AgentLogger
-    from supported_models import find_supported_model_given_model_name
+    from supported_models import find_supported_model_given_model_name, SUPPORTED_MODELS
 except (ImportError, ModuleNotFoundError):
     # Add parent directory to path for tools and supabase_utils
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -157,6 +157,7 @@ class ProjectManagerAgent:
             repos=repos,
             installation_id=installation_id,
             branch=branch,
+            model_provider=self.model_provider,
             model_name=model_name,
             live_logging=self.live_logging,
             run_id=run_id+'_swe',

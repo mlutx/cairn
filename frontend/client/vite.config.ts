@@ -20,6 +20,14 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      '/active-tasks': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/task-logs': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   build: {

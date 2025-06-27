@@ -25,6 +25,10 @@ export interface Task {
   jobs?: string[];
   createdAt?: string;
   updatedAt?: string;
+  parent_fullstack_id?: string;
+  parent_run_id?: string;
+  sibling_subtask_ids?: string[];
+  agent_output?: Record<string, any>;
 }
 
 export interface Subtask {

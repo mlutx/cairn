@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 // Pages
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
+import TaskServiceTest from "@/components/TaskServiceTest";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
                     <MainLayout>
                     <Routes>
                       <Route path="/" element={<Dashboard />} />
+                      <Route path="/test-task-service" element={<TaskServiceTest />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </MainLayout>

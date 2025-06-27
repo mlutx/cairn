@@ -114,6 +114,7 @@ const columns = [
   { id: 'title', label: 'Title', sortable: true },
   { id: 'status', label: 'Status', sortable: true },
   { id: 'agent_type', label: 'Agent Type', sortable: true },
+  { id: 'repos', label: 'Repositories', sortable: false },
   { id: 'created_at', label: 'Created', sortable: true },
   { id: 'due_date', label: 'Due Date', sortable: true },
   { id: 'actions', label: 'Actions', sortable: false },
@@ -386,9 +387,22 @@ export default function ListView({ project = "" }: ListViewProps) {
                 </div>
               )}
               <Badge variant="outline" className="text-xs">
-                {childTask.agent_type || 'Unassigned'}
+                {childTask.agent_type || 'Unknown'}
               </Badge>
             </div>
+          </TableCell>
+          <TableCell className="text-xs">
+            {childTask.repos && childTask.repos.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {childTask.repos.map((repo, idx) => (
+                  <Badge key={idx} variant="secondary" className="text-xs">
+                    {repo}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <span className="text-muted-foreground">No repos</span>
+            )}
           </TableCell>
           <TableCell className="text-sm">{format(new Date(childTask.created_at), "MMM d, yyyy")}</TableCell>
           <TableCell className="text-sm pr-6">
@@ -661,6 +675,15 @@ export default function ListView({ project = "" }: ListViewProps) {
                     </TableHead>
                     <TableHead
                       className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort('repos')}
+                    >
+                      <div className="flex items-center">
+                        Repositories
+                        {getSortIcon('repos')}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50"
                       onClick={() => handleSort('created_at')}
                     >
                       <div className="flex items-center">
@@ -724,9 +747,22 @@ export default function ListView({ project = "" }: ListViewProps) {
                               </div>
                             )}
                             <Badge variant="outline" className="text-xs">
-                              {task.agent_type || 'Unassigned'}
+                              {task.agent_type || 'Unknown'}
                             </Badge>
                           </div>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {task.repos && task.repos.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {task.repos.map((repo, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {repo}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">No repos</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm">{format(new Date(task.created_at), "MMM d, yyyy")}</TableCell>
                         <TableCell className="text-sm pr-6">

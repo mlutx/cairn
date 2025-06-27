@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { Task } from "@/types";
-import { taskApi } from "@/lib/api/task";
+import { fetchTasks as apiFetchTasks } from "@/services/taskService";
 
 interface TaskContextType {
   tasks: Task[];
@@ -23,16 +23,16 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<Error | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
-  // Fetch tasks from mock API
+  // Fetch tasks from API
   const fetchTasks = useCallback(async (isManualRefresh: boolean = false) => {
     if (isManualRefresh) {
       setIsLoading(true);
     }
 
     try {
-      // Use our mock API to get tasks
-      const response = await taskApi.getTeamTasks("team-1");
-      setTasks(response.tasks || []);
+      // Use our task service to get tasks from the API
+      const fetchedTasks = await apiFetchTasks();
+      setTasks(fetchedTasks);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch tasks'));
@@ -81,6 +81,23 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     fetchTasks(true);
   }, [fetchTasks]);
+
+  // Auto-refresh every 10 seconds if enabled
+  useEffect(() => {
+    let intervalId: number | undefined;
+
+    if (autoRefreshEnabled) {
+      intervalId = window.setInterval(() => {
+        fetchTasks(false);
+      }, 10000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [autoRefreshEnabled, fetchTasks]);
 
   return (
     <TaskContext.Provider

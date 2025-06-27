@@ -74,6 +74,30 @@ const isChildTask = (task: Task): boolean => {
   return !!task.parent_run_id || !!task.parent_fullstack_id;
 };
 
+// Helper function to check if a task has subtasks in its agent_output
+const hasSubtasksInOutput = (task: Task): boolean => {
+  return (
+    task.agent_type === "Fullstack" &&
+    task.status === "Done" &&
+    !!task.agent_output &&
+    !!task.agent_output.list_of_subtasks &&
+    Array.isArray(task.agent_output.list_of_subtasks) &&
+    task.agent_output.list_of_subtasks.length > 0
+  );
+};
+
+// Interface for virtual subtasks created from agent output
+interface VirtualSubtask {
+  id: string;
+  title: string;
+  description: string;
+  repo: string;
+  difficulty: string;
+  assignment: string;
+  index: number;
+  parentTaskId: string;
+}
+
 export default function KanbanBoard({ project }: KanbanBoardProps) {
   const [selectedTask, setSelectedTask] = useState<Task | undefined>(undefined);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
@@ -81,7 +105,10 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
   const [logsDialogOpen, setLogsDialogOpen] = useState(false);
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const { tasks, isLoading, error } = useTasks();
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
+  const [currentSubtaskIndex, setCurrentSubtaskIndex] = useState<number | null>(null);
+  const [currentParentTaskId, setCurrentParentTaskId] = useState<string | null>(null);
+  const { tasks, isLoading, error, refreshTasks } = useTasks();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -96,11 +123,91 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     setExpandedTasks(newExpandedTasks);
   };
 
+  // Create a subtask from fullstack planner output
+  const createSubtask = async (parentTaskId: string, subtaskIndex: number) => {
+    setIsCreatingSubtask(true);
+    setCurrentSubtaskIndex(subtaskIndex);
+    setCurrentParentTaskId(parentTaskId);
+
+    try {
+      const response = await fetch('http://localhost:8000/create-subtasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullstack_planner_run_id: parentTaskId,
+          subtask_index: subtaskIndex
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to create subtask');
+      }
+
+      const result = await response.json();
+
+      if (result.created_tasks.length > 0) {
+        toast({
+          title: "Success",
+          description: `Created subtask successfully`,
+        });
+        // Refresh tasks to show the newly created subtask
+        refreshTasks();
+      } else {
+        toast({
+          title: "Note",
+          description: result.message,
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create subtask",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingSubtask(false);
+      setCurrentSubtaskIndex(null);
+      setCurrentParentTaskId(null);
+    }
+  };
+
+  // Run a subtask that's already been created
+  const runSubtask = async (taskId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8000/run-task/${taskId}`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to run task');
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "Success",
+        description: "Task started successfully",
+      });
+
+      // Refresh tasks to show updated status
+      refreshTasks();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to run task",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Memoize filtered tasks to prevent unnecessary re-renders
-  const { projectTasks, queuedTasks, runningTasks, doneTasks, failedTasks, waitingForInputTasks, taskMap, childTaskMap } = useMemo(() => {
+  const { projectTasks, queuedTasks, runningTasks, doneTasks, failedTasks, waitingForInputTasks, taskMap, childTaskMap, virtualSubtaskMap } = useMemo(() => {
     // Filter tasks by project if specified
     const filteredTasks = project
-      ? tasks.filter(task => task.project === project)
+      ? tasks.filter(task => task.repos?.includes(project))
       : tasks;
 
     // Create a map of tasks by their IDs for quick lookup
@@ -119,6 +226,71 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
           const children = childTaskMap.get(parentId) || [];
           children.push(task);
           childTaskMap.set(parentId, children);
+        }
+      }
+    });
+
+    // Create virtual subtasks from fullstack planner output
+    const virtualSubtaskMap = new Map<string, VirtualSubtask[]>();
+
+    filteredTasks.forEach(task => {
+      if (hasSubtasksInOutput(task)) {
+        const subtasks = task.agent_output?.list_of_subtasks || [];
+        const subtaskTitles = task.agent_output?.list_of_subtask_titles || [];
+        const subtaskRepos = task.agent_output?.list_of_subtask_repos || [];
+        const subtaskDifficulties = task.agent_output?.assessment_of_subtask_difficulty || [];
+        const subtaskAssignments = task.agent_output?.assessment_of_subtask_assignment || [];
+
+        // Check if there are already child tasks for this parent
+        const existingChildTasks = childTaskMap.get(task.id) || [];
+
+        // Track which subtask indices already have tasks created
+        const existingSubtaskIndices = new Set();
+
+        // Check both by subtask_index and by matching titles/descriptions
+        existingChildTasks.forEach(childTask => {
+          // Check by subtask_index if available
+          if (childTask.agent_output && typeof childTask.agent_output.subtask_index !== 'undefined') {
+            existingSubtaskIndices.add(childTask.agent_output.subtask_index);
+          }
+
+          // Also check by title/description match
+          subtasks.forEach((subtaskDesc, idx) => {
+            const subtaskTitle = subtaskTitles[idx] || `Subtask ${idx + 1}`;
+
+            // If title or description matches, consider this subtask already created
+            if (
+              (childTask.title && subtaskTitle && childTask.title.includes(subtaskTitle)) ||
+              (childTask.description && subtaskDesc && childTask.description.includes(subtaskDesc))
+            ) {
+              existingSubtaskIndices.add(idx);
+            }
+          });
+        });
+
+        // Only create virtual subtasks for those that don't have real tasks yet
+        const virtualSubtasks: VirtualSubtask[] = [];
+
+        subtasks.forEach((subtask, index) => {
+          // Skip if this subtask index already has a real task
+          if (existingSubtaskIndices.has(index)) {
+            return;
+          }
+
+          virtualSubtasks.push({
+            id: `virtual-${task.id}-${index}`,
+            title: subtaskTitles[index] || `Subtask ${index + 1}`,
+            description: subtask,
+            repo: subtaskRepos[index] || '',
+            difficulty: subtaskDifficulties[index] || 'Not specified',
+            assignment: subtaskAssignments[index] || 'agent',
+            index,
+            parentTaskId: task.id
+          });
+        });
+
+        if (virtualSubtasks.length > 0) {
+          virtualSubtaskMap.set(task.id, virtualSubtasks);
         }
       }
     });
@@ -153,7 +325,8 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
       failedTasks: failed,
       waitingForInputTasks: waitingForInput,
       taskMap,
-      childTaskMap
+      childTaskMap,
+      virtualSubtaskMap
     };
   }, [tasks, project]);
 
@@ -178,15 +351,49 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     setLogsDialogOpen(true);
   };
 
+  // Render a virtual subtask card
+  const renderVirtualSubtaskCard = (subtask: VirtualSubtask) => {
+    const isCurrentlyCreating = isCreatingSubtask &&
+                               currentSubtaskIndex === subtask.index &&
+                               currentParentTaskId === subtask.parentTaskId;
+
+    return (
+      <div key={subtask.id} className="pl-4 mt-2 border-l-2 border-slate-600 bg-slate-800/30 p-3 rounded-md">
+        <div className="flex justify-between items-start">
+          <div>
+            <h4 className="text-sm font-medium">{subtask.title}</h4>
+            <p className="text-xs text-muted-foreground mt-1">{subtask.description}</p>
+            <div className="flex gap-2 mt-2">
+              <span className="text-xs px-2 py-1 bg-slate-700 rounded-full">{subtask.difficulty}</span>
+              <span className="text-xs px-2 py-1 bg-slate-700 rounded-full">{subtask.assignment}</span>
+              <span className="text-xs px-2 py-1 bg-slate-700 rounded-full">{subtask.repo}</span>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => createSubtask(subtask.parentTaskId, subtask.index)}
+            disabled={isCurrentlyCreating}
+          >
+            {isCurrentlyCreating ? "Creating..." : "Create Task"}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   // Render a task card with expansion controls if needed
   const renderTaskCard = (task: Task, nestingLevel: number = 0) => {
     const hasChildren = task.sibling_subtask_ids && task.sibling_subtask_ids.length > 0;
     const isExpanded = expandedTasks.has(task.id);
     const childTasks = childTaskMap.get(task.id) || [];
+    const virtualSubtasks = virtualSubtaskMap.get(task.id) || [];
     const hasChildTasks = childTasks.length > 0;
+    const hasVirtualSubtasks = virtualSubtasks.length > 0;
+    const shouldShowExpansionControl = hasChildren || hasChildTasks || hasVirtualSubtasks || hasSubtasksInOutput(task);
 
-    // Create expansion control if task has children
-    const expansionControl = (hasChildren || hasChildTasks) ? (
+    // Create expansion control if task has children or subtasks
+    const expansionControl = shouldShowExpansionControl ? (
       <Button
         variant="ghost"
         size="icon"
@@ -208,10 +415,42 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
           expansionControl={expansionControl}
         />
 
-        {/* Show child tasks when expanded */}
-        {isExpanded && hasChildTasks && (
+        {/* Show child tasks and virtual subtasks when expanded */}
+        {isExpanded && (
           <div className="pl-4 mt-2 border-l-2 border-slate-600 space-y-2">
-            {childTasks.map((childTask: Task) => renderTaskCard(childTask, nestingLevel + 1))}
+            {/* Render real child tasks */}
+            {childTasks.map((childTask: Task) => {
+              // For child tasks that were created from subtasks, add a "Run" button if they're not running/completed
+              const isSubtask = childTask.parent_fullstack_id === task.id;
+              const canRun = isSubtask && childTask.status !== "Running" && childTask.status !== "Done";
+
+              return (
+                <div key={childTask.id} className="relative">
+                  <TaskCard
+                    task={childTask}
+                    onClick={() => handleTaskClick(childTask)}
+                    expansionControl={null}
+                  />
+                  {canRun && (
+                    <div className="absolute top-2 right-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          runSubtask(childTask.id);
+                        }}
+                      >
+                        Run Task
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Render virtual subtasks from agent output */}
+            {hasVirtualSubtasks && virtualSubtasks.map(renderVirtualSubtaskCard)}
           </div>
         )}
       </div>

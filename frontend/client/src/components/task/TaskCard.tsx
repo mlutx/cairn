@@ -15,6 +15,7 @@ import { useState } from "react";
 import sweAvatar from "@/assets/swe-icon.png";
 import pmAvatar from "@/assets/pm-icon.png";
 import fullstackAvatar from "@/assets/fullstack-icon.png";
+import { GitBranch } from "lucide-react";
 
 interface TaskCardProps {
   task: Task;
@@ -112,6 +113,10 @@ export default function TaskCard({ task, onClick, className, expansionControl }:
     e.stopPropagation();
   };
 
+  // Get repo count badge
+  const repoCount = task.repos?.length || 0;
+  const repoLabel = repoCount === 1 ? "1 repo" : `${repoCount} repos`;
+
   return (
     <div
       className={`p-2 bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition-shadow cursor-pointer space-y-1 ${className || ''}`}
@@ -119,21 +124,23 @@ export default function TaskCard({ task, onClick, className, expansionControl }:
     >
       <div className="flex items-start justify-between">
         <h3 className="font-medium text-sm">{task.title}</h3>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild onClick={handleDialogClick}>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-              🪵 View Logs
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Watch your agent cook 🔥</DialogTitle>
-            </DialogHeader>
-            <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
-              <pre className="text-xs text-slate-100">{JSON.stringify(mockLogs, null, 2)}</pre>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild onClick={handleDialogClick}>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                🪵 View Logs
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Watch your agent cook 🔥</DialogTitle>
+              </DialogHeader>
+              <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
+                <pre className="text-xs text-slate-100">{JSON.stringify(mockLogs, null, 2)}</pre>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
       <div className="flex items-start justify-between">
         {task.description && (
@@ -161,6 +168,12 @@ export default function TaskCard({ task, onClick, className, expansionControl }:
         </div>
         <div className="flex items-center gap-2">
           {expansionControl}
+          {repoCount > 0 && (
+            <Badge variant="outline" className="text-xs py-0 h-5 flex items-center gap-1">
+              <GitBranch className="h-3 w-3" />
+              {repoLabel}
+            </Badge>
+          )}
           {task.due_date && (
             <span>{format(new Date(task.due_date), "MMM d, yyyy")}</span>
           )}

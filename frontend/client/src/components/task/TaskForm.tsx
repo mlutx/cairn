@@ -372,7 +372,7 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       model_provider: initialData?.model_provider || savedModelProvider || "",
       model_name: initialData?.model_name || savedModelName || "",
       tags: initialData?.tags || [],
-      runOnCreate: true,
+      runOnCreate: false,
     },
   });
 
@@ -410,6 +410,12 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
     try {
       const data = await fetchModels();
       setModelProviders(data.providers);
+
+      // Update selectedModels if a provider is already selected
+      const currentProvider = form.getValues("model_provider");
+      if (currentProvider && data.providers[currentProvider]) {
+        setSelectedModels(data.providers[currentProvider].models || []);
+      }
     } catch (error) {
       console.error("Error fetching model providers:", error);
       toast({
@@ -421,61 +427,6 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       setIsLoadingModels(false);
     }
   };
-
-  // --- ENFORCE MODEL SELECTION ---
-  // 1. On provider or model list change, always set a model if not set or not in the list
-  useEffect(() => {
-    if (selectedModelProvider && modelProviders[selectedModelProvider]) {
-      const models = modelProviders[selectedModelProvider].models || [];
-      setSelectedModels(models);
-      const currentModel = form.getValues("model_name");
-      if (models.length > 0) {
-        if (!currentModel || !models.includes(currentModel)) {
-          form.setValue("model_name", models[0], { shouldValidate: true, shouldDirty: true });
-        }
-      } else {
-        if (currentModel) form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
-      }
-    } else {
-      setSelectedModels([]);
-      form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
-    }
-  }, [selectedModelProvider, modelProviders, form]);
-
-  // 2. On form open, always set a model if provider is selected
-  useEffect(() => {
-    if (open && mode === "create" && !isLoadingModels) {
-      const currentProvider = form.getValues("model_provider");
-      if (currentProvider && modelProviders[currentProvider]?.models?.length > 0) {
-        form.setValue("model_name", modelProviders[currentProvider].models[0], { shouldValidate: true, shouldDirty: true });
-      }
-    }
-  }, [open, mode, isLoadingModels, modelProviders, form]);
-
-  // 3. On provider select in UI, always set model to first
-  <FormField
-    control={form.control}
-    name="model_provider"
-    render={({ field }) => (
-      <FormItem className="flex-1">
-        <FormControl>
-          <Select
-            onValueChange={(value) => {
-              field.onChange(value);
-              if (modelProviders[value]?.models?.length > 0) {
-                form.setValue("model_name", modelProviders[value].models[0], { shouldValidate: true, shouldDirty: true });
-              } else {
-                form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
-              }
-            }}
-            value={field.value || ""}
-          >
-            {/* ... existing code ... */}
-          </Select>
-        </FormControl>
-      </FormItem>
-    )}
-  />
 
   // Save selected model provider and model to localStorage when they change
   useEffect(() => {
@@ -490,34 +441,6 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
       localStorage.setItem('lastModelName', currentModel);
     }
   }, [form.watch("model_provider"), form.watch("model_name")]);
-
-  // Auto-select model provider and model when form opens
-  useEffect(() => {
-    if (open && mode === "create" && !isLoadingModels) {
-      const currentProvider = form.getValues("model_provider");
-      const currentModel = form.getValues("model_name");
-
-      // If we have providers but no provider is selected, select the first one
-      if (Object.keys(modelProviders).length > 0) {
-        if (!currentProvider) {
-          const firstProvider = Object.keys(modelProviders)[0];
-          form.setValue("model_provider", firstProvider);
-
-          // Always select the first model for this provider
-          const models = modelProviders[firstProvider]?.models || [];
-          if (models.length > 0) {
-            form.setValue("model_name", models[0], { shouldValidate: true, shouldDirty: true });
-          }
-        } else if (currentProvider && (!currentModel || !modelProviders[currentProvider]?.models?.includes(currentModel))) {
-          // If provider is selected but model is not valid, set the first model
-          const models = modelProviders[currentProvider]?.models || [];
-          if (models.length > 0) {
-            form.setValue("model_name", models[0], { shouldValidate: true, shouldDirty: true });
-          }
-        }
-      }
-    }
-  }, [open, mode, isLoadingModels, modelProviders, form]);
 
   // Reset loading state and initialize when form opens
   useEffect(() => {
@@ -643,13 +566,8 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
 
   const onSubmit = async (values: TaskFormValues) => {
     try {
-      // ENFORCE: If model_name is not set, set it to the first model of the provider
-      if (values.model_provider && modelProviders[values.model_provider]?.models?.length > 0) {
-        if (!values.model_name || !modelProviders[values.model_provider].models.includes(values.model_name)) {
-          values.model_name = modelProviders[values.model_provider].models[0];
-        }
-      } else if (values.model_provider && (!values.model_name || modelProviders[values.model_provider]?.models?.length === 0)) {
-        // Show error if provider is selected but no models available
+      // Check if provider is selected but no models available
+      if (values.model_provider && !values.model_name && modelProviders[values.model_provider]?.models?.length === 0) {
         toast({
           title: "Error",
           description: `No models available for ${values.model_provider}. Please select a different provider.`,
@@ -938,10 +856,13 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                         <Select
                           onValueChange={(value) => {
                             field.onChange(value);
-                            // Always set a model when provider changes
-                            if (modelProviders[value]?.models?.length > 0) {
-                              form.setValue("model_name", modelProviders[value].models[0], { shouldValidate: true, shouldDirty: true });
+                            // Update available models and always clear the current model selection
+                            if (modelProviders[value]?.models) {
+                              setSelectedModels(modelProviders[value].models);
+                              // Clear the model selection when provider changes
+                              form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
                             } else {
+                              setSelectedModels([]);
                               form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
                             }
                           }}
