@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Task } from "@/types";
 import {
   Dialog,
@@ -27,19 +27,23 @@ export default function TaskLogsDialog({
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<string>("logs");
+  const currentTaskIdRef = useRef<string | undefined>();
+
+  // Stable task ID to prevent unnecessary re-renders
+  const taskId = useMemo(() => task?.id, [task?.id]);
 
   // Fetch logs when dialog opens or task changes
   useEffect(() => {
     let intervalId: number | undefined;
 
     const fetchLogs = async () => {
-      if (!open || !task?.id) return;
+      if (!open || !taskId) return;
 
       setIsLoading(true);
       setError(null);
 
       try {
-        const response = await fetch(`http://localhost:8000/task-logs/${task.id}`);
+        const response = await fetch(`http://localhost:8000/task-logs/${taskId}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch logs: ${response.status} ${response.statusText}`);
@@ -57,7 +61,7 @@ export default function TaskLogsDialog({
     };
 
     // Initial fetch
-    if (open && task?.id && activeTab === "logs") {
+    if (open && taskId && activeTab === "logs") {
       fetchLogs();
 
       // Set up auto-refresh every 2 seconds
@@ -70,14 +74,15 @@ export default function TaskLogsDialog({
         window.clearInterval(intervalId);
       }
     };
-  }, [open, task?.id, activeTab]);
+  }, [open, taskId, activeTab]);
 
-  // Reset to logs tab when opening a new task
+  // Reset to logs tab when opening a new task - only when the task ID actually changes
   useEffect(() => {
-    if (open) {
+    if (open && taskId && currentTaskIdRef.current !== taskId) {
       setActiveTab("logs");
+      currentTaskIdRef.current = taskId;
     }
-  }, [open, task?.id]);
+  }, [open, taskId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
