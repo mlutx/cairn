@@ -229,7 +229,8 @@ export default function ListView({ project = "" }: ListViewProps) {
   const handleConfirmDelete = async () => {
     if (taskToDelete) {
       try {
-        await taskApi.deleteTasks([taskToDelete]);
+        // Use our new deleteTask function instead of taskApi.deleteTasks
+        await import('@/services/taskService').then(module => module.deleteTask(taskToDelete));
         deleteTask(taskToDelete);
         toast({
           title: "Task deleted",

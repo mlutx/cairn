@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { deleteTask as deleteTaskService } from "@/services/taskService";
 
 interface KanbanBoardProps {
   project?: string;
@@ -101,7 +102,7 @@ interface VirtualSubtask {
 }
 
 export default function KanbanBoard({ project }: KanbanBoardProps) {
-  const [selectedTask, setSelectedTask] = useState<Task | undefined>(undefined);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(false);
   const [logsDialogOpen, setLogsDialogOpen] = useState(false);
@@ -112,7 +113,9 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
   const [currentParentTaskId, setCurrentParentTaskId] = useState<string | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<Task | null>(null);
-  const { tasks, isLoading, error, refreshTasks } = useTasks();
+  const [isCreatingAllSubtasks, setIsCreatingAllSubtasks] = useState(false);
+  const [currentRunAllTaskId, setCurrentRunAllTaskId] = useState<string | null>(null);
+  const { tasks, isLoading, error, deleteTask: removeTaskFromState, refreshTasks } = useTasks();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -207,6 +210,25 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     }
   };
 
+  // Handle task deletion
+  const handleDeleteTask = async (task: Task) => {
+    try {
+      await deleteTaskService(task.id);
+      // Remove task from local state
+      removeTaskFromState(task.id);
+      toast({
+        title: "Task deleted",
+        description: "The task has been deleted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Memoize filtered tasks to prevent unnecessary re-renders
   const { projectTasks, queuedTasks, runningTasks, doneTasks, failedTasks, waitingForInputTasks, taskMap, childTaskMap, virtualSubtaskMap } = useMemo(() => {
     // Filter tasks by project if specified
@@ -271,7 +293,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
           }
 
           // Also check by title/description match
-          subtasks.forEach((subtaskDesc, idx) => {
+          subtasks.forEach((subtaskDesc: string, idx: number) => {
             const subtaskTitle = subtaskTitles[idx] || `Subtask ${idx + 1}`;
 
             // If title or description matches, consider this subtask already created
@@ -287,7 +309,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
         // Only create virtual subtasks for those that don't have real tasks yet
         const virtualSubtasks: VirtualSubtask[] = [];
 
-        subtasks.forEach((subtask, index) => {
+        subtasks.forEach((subtask: string, index: number) => {
           // Skip if this subtask index already has a real task
           if (existingSubtaskIndices.has(index)) {
             return;
@@ -412,9 +434,81 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
           onClick={() => {}} // No action on click for virtual tasks
           expansionControl={customExpansionControl}
           onViewLogs={handleViewLogsClick}
+          onDeleteTask={handleDeleteTask}
+          onRunAllChildTasks={undefined}
+          isCreatingAllSubtasks={false}
+          hasVirtualSubtasks={false}
         />
       </div>
     );
+  };
+
+  // Create all subtasks from fullstack planner output
+  const runAllChildTasks = async (parentTaskId: string) => {
+    setIsCreatingAllSubtasks(true);
+    setCurrentRunAllTaskId(parentTaskId);
+
+    try {
+      const parentTask = tasks.find(task => task.id === parentTaskId);
+      if (!parentTask || !hasSubtasksInOutput(parentTask)) {
+        throw new Error('Parent task not found or has no subtasks');
+      }
+
+      const subtasks = parentTask.agent_output?.list_of_subtasks || [];
+      const virtualSubtasks = virtualSubtaskMap.get(parentTaskId) || [];
+
+      // Only create subtasks that haven't been created yet (i.e., the virtual ones)
+      const createPromises = virtualSubtasks.map(async (virtualSubtask) => {
+        try {
+          const response = await fetch('http://localhost:8000/create-subtasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fullstack_planner_run_id: parentTaskId,
+              subtask_index: virtualSubtask.index
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || `Failed to create subtask ${virtualSubtask.index}`);
+          }
+
+          return await response.json();
+        } catch (error) {
+          console.error(`Error creating subtask ${virtualSubtask.index}:`, error);
+          throw error;
+        }
+      });
+
+      const results = await Promise.allSettled(createPromises);
+      const successful = results.filter(result => result.status === 'fulfilled').length;
+      const failed = results.filter(result => result.status === 'rejected').length;
+
+      if (successful > 0) {
+        toast({
+          title: "Success",
+          description: `Created ${successful} subtask${successful > 1 ? 's' : ''} successfully${failed > 0 ? `, ${failed} failed` : ''}`,
+        });
+        // Refresh tasks to show the newly created subtasks
+        refreshTasks();
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create any subtasks",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create subtasks",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingAllSubtasks(false);
+      setCurrentRunAllTaskId(null);
+    }
   };
 
   // Render a task card with expansion controls if needed
@@ -426,6 +520,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     const hasChildTasks = childTasks.length > 0;
     const hasVirtualSubtasks = virtualSubtasks.length > 0;
     const shouldShowExpansionControl = hasChildren || hasChildTasks || hasVirtualSubtasks || hasSubtasksInOutput(task);
+    const isCurrentlyCreatingAll = isCreatingAllSubtasks && currentRunAllTaskId === task.id;
 
         // Create expansion control if task has children or subtasks
     const controls = shouldShowExpansionControl ? (
@@ -468,6 +563,10 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
                 </Button>
               ) : null}
               onViewLogs={handleViewLogsClick}
+              onDeleteTask={handleDeleteTask}
+              onRunAllChildTasks={undefined}
+              isCreatingAllSubtasks={false}
+              hasVirtualSubtasks={false}
             />
             {canRun && (
               <div className="absolute top-2 right-2">
@@ -500,6 +599,10 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
           onClick={() => handleTaskClick(task)}
           expansionControl={controls}
           onViewLogs={handleViewLogsClick}
+          onDeleteTask={handleDeleteTask}
+          onRunAllChildTasks={(task) => runAllChildTasks(task.id)}
+          isCreatingAllSubtasks={isCurrentlyCreatingAll}
+          hasVirtualSubtasks={virtualSubtasks.length > 0}
         />
 
         {/* Show child tasks and virtual subtasks when expanded */}
@@ -642,7 +745,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
       <TaskForm
         open={isTaskFormOpen}
         onOpenChange={setIsTaskFormOpen}
-        initialData={selectedTask}
+        initialData={selectedTask || undefined}
         mode="edit"
       />
 

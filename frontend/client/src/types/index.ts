@@ -54,6 +54,10 @@ export interface Task {
   related_run_ids?: string[];
   // For parent tasks (Fullstack or PM): IDs of child tasks
   sibling_subtask_ids?: string[];
+  // Agent output containing various results based on agent type
+  agent_output?: Record<string, any>;
+  // Team assignment
+  team: string;
 }
 
 export interface User {

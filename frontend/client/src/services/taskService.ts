@@ -54,7 +54,6 @@ export async function fetchTasks(): Promise<Task[]> {
         created_at,
         updated_at,
         agent_output = {},
-        team = 'default'
       } = payload;
 
       // Handle repos field - it could be a single repo string or an array of repos
@@ -80,7 +79,7 @@ export async function fetchTasks(): Promise<Task[]> {
         created_at: created_at || item.created_at,
         updated_at: updated_at || item.updated_at,
         created_by: 'system',
-        team: team,
+        team: 'default',
         agent_output: agent_output
       };
 
@@ -93,5 +92,24 @@ export async function fetchTasks(): Promise<Task[]> {
   } catch (error) {
     console.error("Failed to fetch tasks:", error);
     return [];
+  }
+}
+
+export async function deleteTask(taskId: string): Promise<boolean> {
+  try {
+    console.log(`Deleting task with ID: ${taskId}`);
+    const response = await fetch(`/active-tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to delete task');
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`Error deleting task ${taskId}:`, error);
+    throw error;
   }
 }

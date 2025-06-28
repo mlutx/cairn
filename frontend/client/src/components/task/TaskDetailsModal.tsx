@@ -191,24 +191,8 @@ export default function TaskDetailsModal({ task, open, onOpenChange }: TaskDetai
     const [showVerification, setShowVerification] = useState(false);
     const [showAdditionalNotes, setShowAdditionalNotes] = useState(false);
 
-    return (
+        return (
       <>
-        {/* Branch URL - Prominently displayed */}
-        {(task as any).agent_output?.branch_url && (
-          <div className="mt-2">
-            <Button
-              onClick={() => window.open((task as any).agent_output.branch_url, '_blank')}
-              className="gap-2 h-8 w-full text-white"
-              style={{ backgroundColor: '#5d70d5' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4a5bb8'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5d70d5'}
-            >
-              <GitBranch className="h-4 w-4" />
-              View Branch
-            </Button>
-          </div>
-        )}
-
         {/* Task Details Summary */}
         {/* <div className="mt-3 mb-2">
           <div className="text-xs text-muted-foreground">
@@ -451,8 +435,8 @@ export default function TaskDetailsModal({ task, open, onOpenChange }: TaskDetai
             )}
 
             <div className="flex flex-col space-y-1">
-              {/* Status and Agent Type - Side by side */}
-              <div className="flex gap-2">
+              {/* Status, Agent Type, and Action Button - Side by side */}
+              <div className="flex gap-2 items-center">
                 {/* Status */}
                 <div className="flex-1">
                   <div className="detail-content linear-menu">
@@ -474,6 +458,33 @@ export default function TaskDetailsModal({ task, open, onOpenChange }: TaskDetai
                     <span>{task.agent_type || 'Unknown'}</span>
                   </div>
                 </div>
+
+                {/* Action Button - SWE Branch or PM PR */}
+                {task.agent_type === 'SWE' && (task as any).agent_output?.branch_url && (
+                  <Button
+                    onClick={() => window.open((task as any).agent_output.branch_url, '_blank')}
+                    className="gap-2 h-7 px-3 text-white text-xs"
+                    style={{ backgroundColor: '#5d70d5' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4a5bb8'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5d70d5'}
+                  >
+                    <GitBranch className="h-3 w-3" />
+                    View Branch
+                  </Button>
+                )}
+
+                {task.agent_type === 'PM' && (task as any).agent_output?.pr_url && (
+                  <Button
+                    onClick={() => window.open((task as any).agent_output.pr_url, '_blank')}
+                    className="gap-2 h-7 px-3 text-white text-xs"
+                    style={{ backgroundColor: '#5d70d5' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4a5bb8'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5d70d5'}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    View PR
+                  </Button>
+                )}
               </div>
 
               {/* Model Provider and Model - Side by side */}

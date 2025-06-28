@@ -15,7 +15,7 @@ import {
 import sweAvatar from "@/assets/swe-icon.png";
 import pmAvatar from "@/assets/pm-icon.png";
 import fullstackAvatar from "@/assets/fullstack-icon.png";
-import { GitBranch } from "lucide-react";
+import { GitBranch, Trash2 } from "lucide-react";
 
 interface TaskCardProps {
   task: Task;
@@ -23,6 +23,10 @@ interface TaskCardProps {
   className?: string;
   expansionControl?: React.ReactNode;
   onViewLogs?: (task: Task) => void; // Add callback for logs
+  onDeleteTask?: (task: Task) => void; // Add callback for deletion
+  onRunAllChildTasks?: (task: Task) => void; // Add callback for running all child tasks
+  isCreatingAllSubtasks?: boolean; // Add loading state for run all
+  hasVirtualSubtasks?: boolean; // Whether there are virtual subtasks that can be created
 }
 
 // Mock team members data
@@ -72,7 +76,7 @@ const mockLogs = {
   ]
 };
 
-export default function TaskCard({ task, onClick, className, expansionControl, onViewLogs }: TaskCardProps) {
+export default function TaskCard({ task, onClick, className, expansionControl, onViewLogs, onDeleteTask, onRunAllChildTasks, isCreatingAllSubtasks, hasVirtualSubtasks }: TaskCardProps) {
   // Debug logging
   console.log(`[TaskCard-${task.id}] Render`);
 
@@ -142,6 +146,21 @@ export default function TaskCard({ task, onClick, className, expansionControl, o
               <span className="text-xs">🪵</span>
             </Button>
           )}
+          {onDeleteTask && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:bg-destructive/10"
+              title="Delete Task"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log(`[TaskCard-${task.id}] Requesting task deletion`);
+                onDeleteTask(task);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
       <div className="flex items-start justify-between">
@@ -167,6 +186,30 @@ export default function TaskCard({ task, onClick, className, expansionControl, o
             <AvatarFallback>{assigneeInitials}</AvatarFallback>
           </Avatar>
           <span>{assigneeName}</span>
+
+          {/* Run All Child Tasks button for Fullstack tasks */}
+          {task.agent_type === "Fullstack" &&
+           task.status === "Done" &&
+           onRunAllChildTasks &&
+           hasVirtualSubtasks && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground ml-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRunAllChildTasks(task);
+              }}
+              disabled={isCreatingAllSubtasks}
+              title="Run All Child Tasks"
+            >
+              {isCreatingAllSubtasks ? (
+                <span className="animate-spin text-xs">⟳</span>
+              ) : (
+                <span>▶</span>
+              )}
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {expansionControl}
