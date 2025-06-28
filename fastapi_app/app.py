@@ -217,9 +217,6 @@ app.add_middleware(
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 STATIC_DIR = PROJECT_ROOT / "static"
 
-# Mount static files
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
 # Use absolute path to ensure database is found regardless of working directory
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cairn_tasks.db")
 
