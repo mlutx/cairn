@@ -11,18 +11,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+
 import sweAvatar from "@/assets/swe-icon.png";
 import pmAvatar from "@/assets/pm-icon.png";
 import fullstackAvatar from "@/assets/fullstack-icon.png";
 import { GitBranch } from "lucide-react";
-import TaskLogsDialog from "./TaskLogsDialog";
 
 interface TaskCardProps {
   task: Task;
   onClick?: () => void;
   className?: string;
   expansionControl?: React.ReactNode;
+  onViewLogs?: (task: Task) => void; // Add callback for logs
 }
 
 // Mock team members data
@@ -72,8 +72,9 @@ const mockLogs = {
   ]
 };
 
-export default function TaskCard({ task, onClick, className, expansionControl }: TaskCardProps) {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+export default function TaskCard({ task, onClick, className, expansionControl, onViewLogs }: TaskCardProps) {
+  // Debug logging
+  console.log(`[TaskCard-${task.id}] Render`);
 
   // Get assignee details with more robust matching
   const assignee = mockTeamMembers.find((member: TeamUser) => {
@@ -126,23 +127,21 @@ export default function TaskCard({ task, onClick, className, expansionControl }:
       <div className="flex items-start justify-between">
         <h3 className="font-medium text-sm">{task.title}</h3>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            title="View Logs"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsDialogOpen(true);
-            }}
-          >
-            <span className="text-xs">🪵</span>
-          </Button>
-          <TaskLogsDialog
-            open={isDialogOpen}
-            onOpenChange={setIsDialogOpen}
-            task={task}
-          />
+          {onViewLogs && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              title="View Logs"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log(`[TaskCard-${task.id}] Requesting logs dialog`);
+                onViewLogs(task);
+              }}
+            >
+              <span className="text-xs">🪵</span>
+            </Button>
+          )}
         </div>
       </div>
       <div className="flex items-start justify-between">

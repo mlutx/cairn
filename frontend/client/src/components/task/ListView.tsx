@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Task, FilterOptions, TeamUser } from "@/types";
 import { AgentType } from "@/types/task";
@@ -157,13 +157,16 @@ export default function ListView({ project = "" }: ListViewProps) {
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(false);
-  const [logsDialogOpen, setLogsDialogOpen] = useState(false);
-  const [selectedTaskForLogs, setSelectedTaskForLogs] = useState<Task | null>(null);
+    const [logsDialogOpen, setLogsDialogOpen] = useState(false);
+  const [selectedTaskIdForLogs, setSelectedTaskIdForLogs] = useState<string | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const pageSize = 10;
   const { user } = useAuth();
   const teamId = user?.team_id;
   const { tasks, isLoading, error, deleteTask } = useTasks();
+
+  // Debug logging for re-renders and state changes
+  console.log('[ListView] Component render - logsDialogOpen:', logsDialogOpen, 'selectedTaskIdForLogs:', selectedTaskIdForLogs, 'tasks length:', tasks.length);
 
   // Use mock team members data instead of API call
   const teamMembers = mockTeamMembers;
@@ -314,11 +317,12 @@ export default function ListView({ project = "" }: ListViewProps) {
     });
   };
 
-  // Handle view logs click
-  const handleViewLogsClick = (task: Task) => {
-    setSelectedTaskForLogs(task);
+  // Handle view logs click - use useCallback to prevent unnecessary re-renders
+  const handleViewLogsClick = useCallback((task: Task) => {
+    console.log('[ListView] Opening logs dialog for task:', task.id);
+    setSelectedTaskIdForLogs(task.id);
     setLogsDialogOpen(true);
-  };
+  }, []);
 
   // Get agent avatar based on agent type
   const getAgentAvatar = (agentType: string | undefined): string | undefined => {
@@ -460,10 +464,10 @@ export default function ListView({ project = "" }: ListViewProps) {
     // Start with all tasks
     let filtered = tasks;
 
-    // Apply project filter if specified
-    if (project) {
-      filtered = filtered.filter((task: Task) => task.project === project);
-    }
+    // Apply project filter if specified (currently not supported by Task type)
+    // if (project) {
+    //   filtered = filtered.filter((task: Task) => task.project === project);
+    // }
 
     // Apply status filter
     if (filterOptions.status !== 'all') {
@@ -887,11 +891,22 @@ export default function ListView({ project = "" }: ListViewProps) {
       </AlertDialog>
 
       {/* Task Logs Dialog */}
-            <TaskLogsDialog
-        open={logsDialogOpen}
-        onOpenChange={setLogsDialogOpen}
-        task={selectedTaskForLogs}
-      />
+      {selectedTaskIdForLogs && (
+        <TaskLogsDialog
+          key={selectedTaskIdForLogs} // Force re-mount only when task ID changes
+          open={logsDialogOpen}
+          onOpenChange={(open) => {
+            console.log('[ListView] TaskLogsDialog onOpenChange called with:', open);
+            console.log('[ListView] Call stack:', new Error().stack);
+            if (!open) {
+              // Clear selected task when closing
+              setSelectedTaskIdForLogs(null);
+            }
+            setLogsDialogOpen(open);
+          }}
+          task={tasks.find(t => t.id === selectedTaskIdForLogs) || null}
+        />
+      )}
     </>
   );
 }

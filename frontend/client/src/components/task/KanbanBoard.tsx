@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Task } from "@/types";
 import { TaskStatus } from "@/types/task";
 import TaskCard from "./TaskCard";
@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MoreHorizontal, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskDetailsSidebar from "./TaskDetailsSidebar";
+import TaskLogsDialog from "./TaskLogsDialog";
 import { useTasks } from "@/contexts/TaskContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -102,7 +103,8 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
   const [selectedTask, setSelectedTask] = useState<Task | undefined>(undefined);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(false);
-  // Removed logs dialog state as it's now handled in TaskCard component
+  const [logsDialogOpen, setLogsDialogOpen] = useState(false);
+  const [selectedTaskIdForLogs, setSelectedTaskIdForLogs] = useState<string | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
   const [currentSubtaskIndex, setCurrentSubtaskIndex] = useState<number | null>(null);
@@ -356,6 +358,13 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     setIsTaskFormOpen(true);
   };
 
+  // Handle view logs click
+  const handleViewLogsClick = useCallback((task: Task) => {
+    console.log('[KanbanBoard] Opening logs dialog for task:', task.id);
+    setSelectedTaskIdForLogs(task.id);
+    setLogsDialogOpen(true);
+  }, []);
+
   // This function is no longer used as logs are handled in TaskCard component
 
   // Render a virtual subtask card
@@ -402,6 +411,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
           task={virtualTask as Task}
           onClick={() => {}} // No action on click for virtual tasks
           expansionControl={customExpansionControl}
+          onViewLogs={handleViewLogsClick}
         />
       </div>
     );
@@ -457,6 +467,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
                   {expandedTasks.has(childTask.id) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 </Button>
               ) : null}
+              onViewLogs={handleViewLogsClick}
             />
             {canRun && (
               <div className="absolute top-2 right-2">
@@ -488,6 +499,7 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
           task={task}
           onClick={() => handleTaskClick(task)}
           expansionControl={controls}
+          onViewLogs={handleViewLogsClick}
         />
 
         {/* Show child tasks and virtual subtasks when expanded */}
@@ -601,7 +613,21 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
         />
       </div>
 
-            {/* Task Logs Dialog is now handled in TaskCard component */}
+      {/* Task Logs Dialog */}
+      {selectedTaskIdForLogs && (
+        <TaskLogsDialog
+          key={selectedTaskIdForLogs}
+          open={logsDialogOpen}
+          onOpenChange={(open) => {
+            console.log('[KanbanBoard] TaskLogsDialog onOpenChange called with:', open);
+            if (!open) {
+              setSelectedTaskIdForLogs(null);
+            }
+            setLogsDialogOpen(open);
+          }}
+          task={tasks.find(t => t.id === selectedTaskIdForLogs) || null}
+        />
+      )}
 
       {/* Task Details Sidebar */}
       {selectedTask && (

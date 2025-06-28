@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Task } from "@/types";
 import {
   Dialog,
@@ -27,65 +27,124 @@ export default function TaskLogsDialog({
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<string>("logs");
-  const currentTaskIdRef = useRef<string | undefined>();
 
-  // Stable task ID to prevent unnecessary re-renders
-  const taskId = useMemo(() => task?.id, [task?.id]);
+  // Use refs to maintain stable references across re-renders
+  const taskIdRef = useRef<string | undefined>();
+  const intervalRef = useRef<number | undefined>();
+  const isDialogOpenRef = useRef(open);
+  const componentIdRef = useRef(`TaskLogsDialog-${Math.random().toString(36).substr(2, 9)}`);
+
+  // Get stable task ID for useEffect dependencies
+  const taskId = task?.id;
+
+  console.log(`[${componentIdRef.current}] TaskLogsDialog render - open:`, open, 'taskId:', taskId, 'task object changed:', task !== taskIdRef.current);
+
+  // Update refs when values change
+  useEffect(() => {
+    console.log(`[${componentIdRef.current}] Refs update effect - taskId:`, taskId, 'open:', open);
+    taskIdRef.current = taskId;
+    isDialogOpenRef.current = open;
+  }, [taskId, open]);
+
+  // Stable onOpenChange callback that prevents unwanted closures
+  const handleOpenChange = useCallback((newOpen: boolean) => {
+    console.log(`[${componentIdRef.current}] handleOpenChange called - newOpen:`, newOpen, 'current state:', isDialogOpenRef.current);
+    console.log(`[${componentIdRef.current}] Call stack:`, new Error().stack);
+
+    // Only allow closing if the dialog is actually open and we're not in the middle of a re-render
+    if (!newOpen && !isDialogOpenRef.current) {
+      console.log(`[${componentIdRef.current}] PREVENTED CLOSE - dialog wasn't actually open`);
+      return; // Prevent closing if dialog wasn't actually open
+    }
+
+    console.log(`[${componentIdRef.current}] ALLOWING state change to:`, newOpen);
+    onOpenChange(newOpen);
+  }, [onOpenChange]);
 
   // Fetch logs when dialog opens or task changes
   useEffect(() => {
-    let intervalId: number | undefined;
+    console.log(`[${componentIdRef.current}] Main effect triggered - open:`, open, 'taskId:', taskId, 'activeTab:', activeTab);
 
     const fetchLogs = async () => {
-      if (!open || !taskId) return;
+      if (!isDialogOpenRef.current || !taskIdRef.current) {
+        console.log(`[${componentIdRef.current}] fetchLogs skipped - open:`, isDialogOpenRef.current, 'taskId:', taskIdRef.current);
+        return;
+      }
 
+      console.log(`[${componentIdRef.current}] Fetching logs for task:`, taskIdRef.current);
       setIsLoading(true);
       setError(null);
 
       try {
-        const response = await fetch(`http://localhost:8000/task-logs/${taskId}`);
+        const response = await fetch(`http://localhost:8000/task-logs/${taskIdRef.current}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch logs: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
+        console.log(`[${componentIdRef.current}] Logs fetched successfully - count:`, data.length);
         setLogs(data);
         setLastUpdated(new Date());
       } catch (err) {
-        console.error("Error fetching logs:", err);
+        console.error(`[${componentIdRef.current}] Error fetching logs:`, err);
         setError(err instanceof Error ? err.message : "Failed to fetch logs");
       } finally {
         setIsLoading(false);
       }
     };
 
-    // Initial fetch
+    // Clear any existing interval
+    if (intervalRef.current) {
+      console.log(`[${componentIdRef.current}] Clearing existing interval:`, intervalRef.current);
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = undefined;
+    }
+
+    // Initial fetch and set up interval if dialog is open
     if (open && taskId && activeTab === "logs") {
+      console.log(`[${componentIdRef.current}] Starting log fetching and interval`);
       fetchLogs();
 
       // Set up auto-refresh every 2 seconds
-      intervalId = window.setInterval(fetchLogs, 2000);
+      intervalRef.current = window.setInterval(() => {
+        console.log(`[${componentIdRef.current}] Interval tick - fetching logs`);
+        fetchLogs();
+      }, 2000);
+      console.log(`[${componentIdRef.current}] Interval set with ID:`, intervalRef.current);
     }
 
-    // Clean up interval when dialog closes or component unmounts
+    // Clean up interval when dependencies change
     return () => {
-      if (intervalId) {
-        window.clearInterval(intervalId);
+      console.log(`[${componentIdRef.current}] Main effect cleanup`);
+      if (intervalRef.current) {
+        console.log(`[${componentIdRef.current}] Cleanup: clearing interval:`, intervalRef.current);
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = undefined;
       }
     };
   }, [open, taskId, activeTab]);
 
-  // Reset to logs tab when opening a new task - only when the task ID actually changes
+  // Reset to logs tab when opening a new task
   useEffect(() => {
-    if (open && taskId && currentTaskIdRef.current !== taskId) {
+    console.log(`[${componentIdRef.current}] Tab reset effect - open:`, open, 'taskId:', taskId);
+    if (open) {
+      console.log(`[${componentIdRef.current}] Resetting to logs tab`);
       setActiveTab("logs");
-      currentTaskIdRef.current = taskId;
     }
   }, [open, taskId]);
 
+  // Log when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log(`[${componentIdRef.current}] Component unmounting`);
+    };
+  }, []);
+
+  console.log(`[${componentIdRef.current}] About to render Dialog with open:`, open);
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
@@ -98,7 +157,10 @@ export default function TaskLogsDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => {
+          console.log(`[${componentIdRef.current}] Tab changed to:`, value);
+          setActiveTab(value);
+        }} className="w-full">
           <TabsList className="grid grid-cols-2 mb-4">
             <TabsTrigger value="logs">Logs</TabsTrigger>
             <TabsTrigger value="details">Task Details</TabsTrigger>
