@@ -175,7 +175,8 @@ You can run Cairn locally, connect it to your github repos and use your favorite
 
 **Option 1: Using the startup script (recommended):**
 ```bash
-./start-dev.sh
+chmod +x run.sh
+./run.sh
 ```
 This script will start both the backend and frontend servers simultaneously and automatically open your browser.
 
