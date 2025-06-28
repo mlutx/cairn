@@ -20,7 +20,7 @@
 Cairn is a simple open-source background-agent system for coding. Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
 You can run Cairn locally, connect it to your github repos and use your favorite LLM to execute fullstack tasks, 100% in the background. Save time for the things you want to do by automating the boring stuff!
 
-![Cairn Demo](static/docs/images/demo1.gif)
+![Cairn Demo](static/docs/images/demo1.gif?cachebust=1)
 
 
 | Provider | Status | Models |
