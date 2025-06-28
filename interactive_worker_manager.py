@@ -205,6 +205,7 @@ class WorkerManager:
                     "repos": repos,
                     "owner": self.owner,
                     "description": description,
+                    "title": description[:50] + ("..." if len(description) > 50 else ""),  # Add title field
                     "subtask_ids": [],
                     "agent_output": {},
                     "agent_status": "Queued",
@@ -221,6 +222,7 @@ class WorkerManager:
                     "repo": repos[0] if repos else "",  # Single repo for SWE/PM
                     "owner": self.owner,
                     "description": description,
+                    "title": description[:50] + ("..." if len(description) > 50 else ""),  # Add title field
                     "agent_output": {},
                     "agent_status": "Queued",
                     "agent_type": agent_type,

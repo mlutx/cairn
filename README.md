@@ -15,7 +15,23 @@
 
 </div>
 
-# Table of Contents
+## 🪨 What is Cairn?
+
+Cairn is a simple open-source background-agent system for coding. Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
+You can run Cairn locally, connect it to your github repos and use your favorite LLM to execute fullstack tasks, 100% in the background. Save time for the things you want to do by automating the boring stuff!
+
+![Cairn Demo](static/docs/images/demo1.gif)
+
+
+| Provider | Status | Models |
+|----------|--------|---------|
+| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
+| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
+| 🟢 **Gemini** | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
+| 🟡 **Deepseek** | 🚧 Coming Soon |
+| 🟡 **Llama** | 🚧 Coming Soon |
+
+## Table of Contents
 
 - [What is Cairn?](#-what-is-cairn)
   - [Model Support](#model-support)
@@ -27,22 +43,6 @@
   - [Contributing](#contributing)
 - [License](#license)
 - [Roadmap](#roadmap)
-
-## 🪨 What is Cairn?
-
-Cairn is a simple open-source background-agent system. Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
-You can run Cairn locally, connect it to your repos, use your favorite LLM and execute fullstack tasks, 100% in the background. Save time for the things you want to do, not the boring stuff!
-
-### Model Support
-
-| Provider | Status | Models |
-|----------|--------|---------|
-| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
-| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
-| 🟢 **Gemini** | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
-| 🟡 **Deepseek** | 🚧 Coming Soon |
-| 🟡 **Llama** | 🚧 Coming Soon |
-
 
 ## Quick Start
 
@@ -56,12 +56,21 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 2. **Install dependencies**
 
-   **Using venv (recommended, but can use conda or system-wide installation as well)**
+   **Backend dependencies (Python):**
    ```bash
    python -m venv cairn-env
    source cairn-env/bin/activate  # On Windows: cairn-env\Scripts\activate
    pip install -r requirements.txt
    ```
+
+   **Frontend dependencies (Node.js):**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+   > **Note**: You'll need Node.js (version 16 or higher) and npm installed on your system.
 
 3. **Set up github access**
 
@@ -107,9 +116,9 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
    • Installation ID: Click "Install App" → Select repositories → Install
      Then check browser URL: https://github.com/settings/installations/[INSTALLATION_ID]
    ```
-   
+
    ### Step 3: Note your credentials for .env and repos.json configuration
-   
+
    You'll need these three values for your configuration:
    - **App ID**: Goes in your `.env` file.
    - **Private Key Path**: Path to your downloaded .pem file, goes in your `.env` file.
@@ -164,27 +173,42 @@ You can run Cairn locally, connect it to your repos, use your favorite LLM and e
 
 ### Running Cairn
 
+**Option 1: Using the startup script (recommended):**
+```bash
+chmod +x run.sh
+./run.sh
+```
+This script will start both the backend and frontend servers simultaneously and automatically open your browser.
+
+**Option 2: Manual startup (two terminals):**
+
+Terminal 1 - Backend:
 ```bash
 python fastapi_app/app.py
 ```
-Then, navigate to `http://0.0.0.0:8000` in your browser.
+
+Terminal 2 - Frontend:
+```bash
+cd frontend
+npm run dev
+```
+
+Then navigate to `http://localhost:5173/` in your browser.
+
+> **Note**: The web interface runs on port 5173 (frontend) which communicates with the FastAPI backend on port 8000.
 
 ---
 
-### Demo
-
-![Cairn Demo](static/docs/images/demo1.gif)
-
 ### Your First Task
 
-1. **Access the interface** (via `http://0.0.0.0:8000`)
-2. **Select an agent type** (Fullstack Planner, PM, or SWE)
+1. Create a task by clicking "New Task" in the top right, or using ctrl+k.
+2. Add a task title, and describe your task.
+3. Select an agent type. There are 3 types to choose from:
 - SWE: recommended for simple self-contained subtasks. Output is a branch with the changes.
 - PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR detailing the changes.
 - Fullstack Planner: recommended for fullstack or multi-step tasks. Output is a list of subtasks that can be ran in parallel, and who will communicate if necessary on cross-subtask code.
-3. **Choose target repositories** from your connected repos
-4. **Describe your task** in natural language
-5. **Monitor progress** through real-time logs and status updates
+4. Choose target repositories from your connected repos
+5. Monitor progress through real-time logs and status updates
 
 ---
 
@@ -367,7 +391,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Embedding search support (auto-updating with github webhooks)
 - and more...
 
-
+---
 
 <div align="center">
 

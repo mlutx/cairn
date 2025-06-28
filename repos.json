@@ -1,7 +1,6 @@
 {
-  "<owner name, e.g. your username or your-work-org>": {
-    "connected_repos": ["frontend", "backend"],
-    "installation_id": 12345678
+  "cairn-dev": {
+    "connected_repos": ["backend", "frontend", "test"],
+    "installation_id": 65848345
   }
-} 
-
+}

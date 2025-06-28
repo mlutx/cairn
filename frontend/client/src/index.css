@@ -1,0 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Cairn Theme Colors */
+  /* #cca079 - Sand */
+  /* #775e4a - Brown */
+  /* #9c9e88 - Sage */
+  /* #bcc4c3 - Stone */
+  /* #c9b0aa - Rose */
+  /* #f1d6bf - Light Sand */
+
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --muted: 30 10% 96%;
+  --muted-foreground: 29 8% 46.1%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --border: 33 20% 90%;
+  --input: 33 20% 90%;
+  --primary: 231 58% 60%; /* #5e6ad2 - New button color */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 97 10% 58%; /* #9c9e88 - Sage */
+  --secondary-foreground: 240 5.9% 10%;
+  --accent: 184 8% 75%; /* #bcc4c3 - Stone */
+  --accent-foreground: 29 28% 38%; /* #775e4a - Brown */
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 231 58% 60%; /* #5e6ad2 - New ring color to match button */
+  --radius: 0.375rem;
+}
+
+.dark {
+  --background: 0 0% 7%; /* Pure black base */
+  --foreground: 0 0% 98%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 75%;
+  --popover: 0 0% 7%;
+  --popover-foreground: 0 0% 98%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 98%;
+  --border: 0 0% 15%;
+  --input: 0 0% 15%;
+  --primary: 231 58% 60%; /* #5e6ad2 - New button color */
+  --primary-foreground: 0 0% 98%;
+  --secondary: 97 10% 50%; /* Darker Sage */
+  --secondary-foreground: 0 0% 98%;
+  --accent: 10 25% 73%; /* #c9b0aa - Rose */
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 231 58% 60%; /* #5e6ad2 - New ring color to match button */
+  --radius: 0.375rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    font-family: 'Montserrat', system-ui, sans-serif;
+    font-weight: 300; /* Less bold for normal text */
+  }
+
+  body {
+    font-family: 'Montserrat', system-ui, sans-serif;
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Cairn text style */
+.cairn-text {
+  font-weight: 700; /* Keep 'cairn' bold */
+}
+
+/* Minimalist aesthetic additions */
+.gradient-text {
+  @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+}
+
+.card-minimal {
+  @apply rounded-md border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md;
+}
+
+/* Auth button hover style */
+.auth-button-hover {
+  @apply hover:bg-[#5e6ad2] hover:text-white hover:border-[#5e6ad2];
+}
+
+/* Task status colors using Cairn theme colors */
+.status-todo {
+  @apply bg-[#c9b0aa] dark:bg-[#c9b0aa]/80; /* Rose */
+}
+
+.status-in-progress {
+  @apply bg-[#cca079] dark:bg-[#cca079]/80; /* Sand */
+}
+
+.status-testing {
+  @apply bg-[#9c9e88] dark:bg-[#9c9e88]/80; /* Sage */
+}
+
+.status-completed {
+  @apply bg-[#775e4a] dark:bg-[#775e4a]/80; /* Brown */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

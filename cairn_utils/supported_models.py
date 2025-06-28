@@ -19,6 +19,7 @@ SUPPORTED_MODELS = {
     "anthropic": {
         "chat_class": ChatAnthropic,
         "response_class": AnthropicResponse,
+        'env_api_key_name': 'ANTHROPIC_API_KEY',
         "models": [
             "claude-sonnet-4-20250514",
             "claude-3-7-sonnet-latest",
@@ -30,6 +31,7 @@ SUPPORTED_MODELS = {
     "openai": {
         "chat_class": ChatOpenAI,
         "response_class": OpenAIResponse,
+        'env_api_key_name': 'OPENAI_API_KEY',
         "models": [
             "gpt-4.1",
             "gpt-4o-mini",
@@ -42,6 +44,7 @@ SUPPORTED_MODELS = {
     "gemini": {
         "chat_class": ChatGemini,
         "response_class": OpenAIResponse,
+        'env_api_key_name': 'GEMINI_API_KEY',
         "models": [
             "gemini-2.0-flash",
             "gemini-2.0-flash-exp",

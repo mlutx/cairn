@@ -342,7 +342,7 @@ async def agent_node(
     llm_client: Any,
     logger: AgentLogger,
     toolbox: Any = None,
-    max_call_stack: int = 3,
+    max_call_stack: int = 4,
 ) -> Dict[str, Any]:
     """
     Agent node that processes state using proper message-based conversation.
@@ -545,7 +545,7 @@ def create_agent_graph(
     logger: AgentLogger,
     toolbox: Any = None,  # Add toolbox parameter for dynamic cairn_settings
     state_type: Type[BaseModel] = AgentState,
-    max_call_stack: int = 3,
+    max_call_stack: int = 4,
 ) -> StateGraph:
     """
     Create a LangGraph workflow for an agent with common patterns.

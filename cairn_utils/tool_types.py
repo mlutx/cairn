@@ -506,6 +506,9 @@ class SWEResponse(BaseModel):
     additional_notes: Optional[str] = Field(
         description="Any additional notes about the implementation", default=None
     )
+    branch_url: Optional[str] = Field(
+        description="URL link to the GitHub branch containing the changes", default=None
+    )
 
 
 # Manager Tool Box - get_generate_output_tool
