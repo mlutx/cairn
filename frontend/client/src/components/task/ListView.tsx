@@ -35,6 +35,7 @@ import { ArrowUpDown, ChevronDown, ChevronUp, Download, Pencil, Trash2, ChevronR
 import { getInitials } from "@/lib/utils/task-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import TaskDetailsSidebar from "./TaskDetailsSidebar";
+import TaskDetailsModal from "./TaskDetailsModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -160,6 +161,8 @@ export default function ListView({ project = "" }: ListViewProps) {
     const [logsDialogOpen, setLogsDialogOpen] = useState(false);
   const [selectedTaskIdForLogs, setSelectedTaskIdForLogs] = useState<string | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<Task | null>(null);
   const pageSize = 10;
   const { user } = useAuth();
   const teamId = user?.team_id;
@@ -204,13 +207,10 @@ export default function ListView({ project = "" }: ListViewProps) {
     }
   }, [filterOptions, setSearchParams, searchParams]);
 
-  // Handle task click to show details
+  // Handle task click to show details modal
   const handleTaskClick = (task: Task) => {
-    // Instead of navigating, show a toast notification
-    // toast({
-    //   title: "Task Selected",
-    //   description: "Task details view has been removed from the application.",
-    // });
+    setSelectedTaskForDetails(task);
+    setIsDetailsModalOpen(true);
   };
 
   // Handle edit button click
@@ -907,6 +907,13 @@ export default function ListView({ project = "" }: ListViewProps) {
           task={tasks.find(t => t.id === selectedTaskIdForLogs) || null}
         />
       )}
+
+      {/* Task Details Modal */}
+      <TaskDetailsModal
+        task={selectedTaskForDetails}
+        open={isDetailsModalOpen}
+        onOpenChange={setIsDetailsModalOpen}
+      />
     </>
   );
 }

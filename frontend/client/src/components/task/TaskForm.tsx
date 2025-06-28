@@ -27,7 +27,7 @@ import { TaskFormData, TeamUser } from "@/types";
 import { AgentType, Task, TaskStatus } from "@/types/task";
 import { useToast } from "@/components/ui/use-toast";
 import { taskApi } from "@/lib/api/task";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -36,14 +36,7 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTasks } from "@/contexts/TaskContext";
 import { useTaskProcessingToast } from "@/components/ui/task-processing-toast";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+
 import { Badge } from "@/components/ui/badge";
 import { fetchConnectedRepos } from "@/lib/api";
 import { fetchModels, ModelsResponse } from "@/lib/api/models";
@@ -278,6 +271,153 @@ const customStyles = `
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// Custom Repository Select Dropdown Component
+interface RepoSelectDropdownProps {
+  value: string[];
+  onChange: (value: string[]) => void;
+  repositories: Record<string, Repository>;
+  isLoading: boolean;
+  mode: "create" | "edit";
+  agentType: string;
+  onRepositoryToggle: (repoId: string) => void;
+  isRepositorySelected: (repoId: string) => boolean;
+  getRepoDisplayName: (id: string) => string;
+  allReposSelected: boolean;
+  setAllReposSelected: (selected: boolean) => void;
+  formSetValue: any;
+}
+
+function RepoSelectDropdown({
+  value,
+  repositories,
+  isLoading,
+  mode,
+  agentType,
+  onRepositoryToggle,
+  isRepositorySelected,
+  getRepoDisplayName,
+  allReposSelected,
+  setAllReposSelected,
+  formSetValue
+}: RepoSelectDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+        // Build options array
+   const options = useMemo(() => {
+     const opts: Array<{id: string, label: string, type: 'option'}> = [];
+
+     // Add individual repositories
+     Object.entries(repositories).forEach(([id, repo]) => {
+       opts.push({
+         id,
+         label: `${repo.owner}/${repo.repo}`,
+         type: "option" as const
+       });
+     });
+
+     return opts;
+   }, [repositories]);
+
+     // Handle keyboard navigation
+   useEffect(() => {
+     if (!isOpen) return;
+
+     const handleKeyDown = (e: KeyboardEvent) => {
+       switch (e.key) {
+         case 'ArrowDown':
+           e.preventDefault();
+           setFocusedIndex(prev => (prev + 1) % options.length);
+           break;
+         case 'ArrowUp':
+           e.preventDefault();
+           setFocusedIndex(prev => (prev - 1 + options.length) % options.length);
+           break;
+         case 'Enter':
+         case ' ':
+           e.preventDefault();
+           const focusedOption = options[focusedIndex];
+           if (focusedOption) {
+             onRepositoryToggle(focusedOption.id);
+           }
+           break;
+         case 'Escape':
+           e.preventDefault();
+           setIsOpen(false);
+           break;
+         case 'Tab':
+           // Let Tab behave normally (move to next form element)
+           setIsOpen(false);
+           break;
+       }
+     };
+
+     document.addEventListener('keydown', handleKeyDown);
+     return () => {
+       document.removeEventListener('keydown', handleKeyDown);
+     };
+   }, [isOpen, focusedIndex, options, onRepositoryToggle]);
+
+  // Reset focus when opening
+  useEffect(() => {
+    if (isOpen) {
+      setFocusedIndex(0);
+    }
+  }, [isOpen]);
+
+  const displayText = useMemo(() => {
+    if (isLoading) return "Loading repositories...";
+    if (value?.length === 0 || (value?.length === 1 && value[0] === "none")) {
+      return mode === "create" ? "All repositories" : "Repositories";
+    }
+    if (value?.filter(r => r !== "none").length === 1) {
+      return getRepoDisplayName(value?.filter(r => r !== "none")[0]);
+    }
+    return `${value?.filter(r => r !== "none").length} repo${value?.filter(r => r !== "none").length > 1 ? 's' : ''}`;
+  }, [value, isLoading, mode, getRepoDisplayName]);
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          className="linear-menu w-full flex justify-between"
+        >
+          <div className="flex items-center">
+            <Github className="h-3.5 w-3.5 mr-1 opacity-70" />
+            <span className="text-sm">{displayText}</span>
+          </div>
+          <ChevronDown className="h-3 w-3 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+             <PopoverContent className="w-[220px] p-1 shadow-md" align="start">
+        <div ref={dropdownRef} className="space-y-1">
+                     {options.map((option: any, index: number) => (
+            <div
+              key={option.id}
+                             className={`flex items-center space-x-2 px-2 py-1.5 rounded cursor-pointer transition-colors text-sm ${
+                 index === focusedIndex
+                   ? 'bg-[#5d70d5] bg-opacity-10'
+                   : 'hover:bg-[#5d70d5] hover:bg-opacity-5'
+               }`}
+                             onClick={() => onRepositoryToggle(option.id)}
+            >
+                             <Checkbox
+                 checked={isRepositorySelected(option.id)}
+                 className="h-3.5 w-3.5 data-[state=checked]:bg-[#5d70d5] data-[state=checked]:border-[#5d70d5] pointer-events-none"
+               />
+                              <span>
+                {option.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Task form validation schema
 const taskFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -325,10 +465,6 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
   const [modelProviders, setModelProviders] = useState<ModelsResponse["providers"]>({});
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const [agentTypeOpen, setAgentTypeOpen] = useState(false);
-  const [modelProviderOpen, setModelProviderOpen] = useState(false);
-  const [modelNameOpen, setModelNameOpen] = useState(false);
-  const [statusOpen, setStatusOpen] = useState(false);
 
   // Define agent types
   const agentTypes = ["Fullstack", "PM", "SWE"];
@@ -794,40 +930,26 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <Popover open={statusOpen} onOpenChange={setStatusOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="linear-menu w-full flex justify-between"
-                            >
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="linear-menu h-7 border-none shadow-none">
+                            <SelectValue>
                               <div className="flex items-center">
                                 <span className={`status-dot ${getStatusDot(field.value)}`}></span>
                                 <span>{field.value}</span>
                               </div>
-                              <ChevronDown className="h-3 w-3 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[200px] p-0" align="start">
-                            <Command>
-                              <CommandList>
-                                <CommandGroup>
-                                  {["Queued", "Running", "Done", "Failed"].map((status) => (
-                                    <CommandItem
-                                      key={status}
-                                      onSelect={() => {
-                                        field.onChange(status);
-                                        setStatusOpen(false);
-                                      }}
-                                    >
-                                      <span className={`status-dot ${getStatusDot(status)}`}></span>
-                                      <span>{status}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["Queued", "Running", "Done", "Failed"].map((status) => (
+                              <SelectItem key={status} value={status}>
+                                <div className="flex items-center">
+                                  <span className={`status-dot ${getStatusDot(status)}`}></span>
+                                  <span>{status}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </FormControl>
                     </FormItem>
                   )}
@@ -840,12 +962,9 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Popover open={agentTypeOpen} onOpenChange={setAgentTypeOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            className="linear-menu w-full flex justify-between"
-                          >
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="linear-menu h-7 border-none shadow-none">
+                          <SelectValue>
                             <div className="flex items-center">
                               {field.value && getAgentTypeIcon(field.value) ? (
                                 <>
@@ -860,40 +979,25 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                                 <span>Select Agent Type</span>
                               )}
                             </div>
-                            <ChevronDown className="h-3 w-3 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[200px] p-0" align="start">
-                          <Command>
-                            <CommandList>
-                              <CommandGroup>
-                                {agentTypes.map((type) => (
-                                  <CommandItem
-                                    key={type}
-                                    onSelect={() => {
-                                      field.onChange(type);
-                                      setAgentTypeOpen(false);
-                                    }}
-                                  >
-                                    {getAgentTypeIcon(type) ? (
-                                      <div className="flex items-center">
-                                        <img
-                                          src={getAgentTypeIcon(type)}
-                                          alt={`${type} icon`}
-                                          className="h-4 w-4 mr-2 object-contain"
-                                        />
-                                        <span>{type}</span>
-                                      </div>
-                                    ) : (
-                                      type
-                                    )}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {agentTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              <div className="flex items-center">
+                                {getAgentTypeIcon(type) && (
+                                  <img
+                                    src={getAgentTypeIcon(type)}
+                                    alt={`${type} icon`}
+                                    className="h-4 w-4 mr-2 object-contain"
+                                  />
+                                )}
+                                <span>{type}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                   </FormItem>
                 )}
@@ -908,12 +1012,24 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormControl>
-                        <Popover open={modelProviderOpen} onOpenChange={setModelProviderOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="linear-menu w-full flex justify-between"
-                            >
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // Update available models and always clear the current model selection
+                            if (modelProviders[value]?.models) {
+                              setSelectedModels(modelProviders[value].models);
+                              // Clear the model selection when provider changes
+                              form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
+                            } else {
+                              setSelectedModels([]);
+                              form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
+                            }
+                          }}
+                          value={field.value}
+                          disabled={isLoadingModels}
+                        >
+                          <SelectTrigger className="linear-menu h-7 border-none shadow-none">
+                            <SelectValue>
                               <div className="flex items-center">
                                 {field.value && getModelProviderLogo(field.value) ? (
                                   <>
@@ -931,57 +1047,31 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                                   </>
                                 )}
                               </div>
-                              <ChevronDown className="h-3 w-3 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[200px] p-0" align="start">
-                            <Command>
-                              <CommandInput placeholder="Search providers..." />
-                              <CommandList>
-                                <CommandEmpty>No providers found.</CommandEmpty>
-                                <CommandGroup>
-                                  {isLoadingModels ? (
-                                    <CommandItem disabled>Loading providers...</CommandItem>
-                                  ) : Object.keys(modelProviders).length === 0 ? (
-                                    <CommandItem disabled>No providers available</CommandItem>
-                                  ) : (
-                                    Object.keys(modelProviders).map((provider) => (
-                                      <CommandItem
-                                        key={provider}
-                                        onSelect={() => {
-                                          field.onChange(provider);
-                                          // Update available models and always clear the current model selection
-                                          if (modelProviders[provider]?.models) {
-                                            setSelectedModels(modelProviders[provider].models);
-                                            // Clear the model selection when provider changes
-                                            form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
-                                          } else {
-                                            setSelectedModels([]);
-                                            form.setValue("model_name", "", { shouldValidate: true, shouldDirty: true });
-                                          }
-                                          setModelProviderOpen(false);
-                                        }}
-                                      >
-                                        {getModelProviderLogo(provider) ? (
-                                          <div className="flex items-center">
-                                            <img
-                                              src={getModelProviderLogo(provider)}
-                                              alt={`${provider} logo`}
-                                              className="h-4 w-4 mr-2 object-contain"
-                                            />
-                                            <span>{provider}</span>
-                                          </div>
-                                        ) : (
-                                          provider
-                                        )}
-                                      </CommandItem>
-                                    ))
-                                  )}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isLoadingModels ? (
+                              <SelectItem value="loading" disabled>Loading providers...</SelectItem>
+                            ) : Object.keys(modelProviders).length === 0 ? (
+                              <SelectItem value="empty" disabled>No providers available</SelectItem>
+                            ) : (
+                              Object.keys(modelProviders).map((provider) => (
+                                <SelectItem key={provider} value={provider}>
+                                  <div className="flex items-center">
+                                    {getModelProviderLogo(provider) && (
+                                      <img
+                                        src={getModelProviderLogo(provider)}
+                                        alt={`${provider} logo`}
+                                        className="h-4 w-4 mr-2 object-contain"
+                                      />
+                                    )}
+                                    <span>{provider}</span>
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
                       </FormControl>
                     </FormItem>
                   )}
@@ -994,13 +1084,13 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormControl>
-                        <Popover open={modelNameOpen} onOpenChange={setModelNameOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="linear-menu w-full flex justify-between"
-                              disabled={!selectedModelProvider}
-                            >
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={!selectedModelProvider}
+                        >
+                          <SelectTrigger className="linear-menu h-7 border-none shadow-none">
+                            <SelectValue>
                               <div className="flex items-center">
                                 {field.value ? (
                                   <span>{field.value}</span>
@@ -1008,37 +1098,22 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                                   <span>{selectedModelProvider ? "Select Model" : "Select provider first"}</span>
                                 )}
                               </div>
-                              <ChevronDown className="h-3 w-3 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[200px] p-0" align="start">
-                            <Command>
-                              <CommandInput placeholder="Search models..." />
-                              <CommandList>
-                                <CommandEmpty>No models found.</CommandEmpty>
-                                <CommandGroup>
-                                  {!selectedModelProvider ? (
-                                    <CommandItem disabled>Select a provider first</CommandItem>
-                                  ) : selectedModels.length === 0 ? (
-                                    <CommandItem disabled>No models available</CommandItem>
-                                  ) : (
-                                    selectedModels.map((model) => (
-                                      <CommandItem
-                                        key={model}
-                                        onSelect={() => {
-                                          field.onChange(model);
-                                          setModelNameOpen(false);
-                                        }}
-                                      >
-                                        {model}
-                                      </CommandItem>
-                                    ))
-                                  )}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {!selectedModelProvider ? (
+                              <SelectItem value="no-provider" disabled>Select a provider first</SelectItem>
+                            ) : selectedModels.length === 0 ? (
+                              <SelectItem value="no-models" disabled>No models available</SelectItem>
+                            ) : (
+                              selectedModels.map((model) => (
+                                <SelectItem key={model} value={model}>
+                                  {model}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
                       </FormControl>
                     </FormItem>
                   )}
@@ -1054,92 +1129,20 @@ export default function TaskForm({ open, onOpenChange, initialData, mode = "crea
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="linear-menu w-full flex justify-between"
-                            >
-                              <div className="flex items-center">
-                                <Github className="h-3.5 w-3.5 mr-1 opacity-70" />
-                                <span className="text-sm">
-                                  {isLoadingRepos ? "Loading repositories..." :
-                                    field.value?.length === 0 || (field.value?.length === 1 && field.value[0] === "none")
-                                    ? (mode === "create" ? "All repositories" : "Repositories")
-                                    : field.value?.filter(r => r !== "none").length === 1
-                                      ? getRepoDisplayName(field.value?.filter(r => r !== "none")[0])
-                                      : `${field.value?.filter(r => r !== "none").length} repo${field.value?.filter(r => r !== "none").length > 1 ? 's' : ''}`}
-                                </span>
-                              </div>
-                              <ChevronDown className="h-3 w-3 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[220px] p-0" align="start">
-                            <Command>
-                              <CommandInput placeholder="Search repositories..." />
-                              <CommandList>
-                                <CommandEmpty>No repositories found.</CommandEmpty>
-                                <CommandGroup>
-                                  <CommandItem
-                                    onSelect={() => handleRepositoryToggle("none")}
-                                    className="flex items-center space-x-2"
-                                  >
-                                    <Checkbox
-                                      checked={isRepositorySelected("none")}
-                                      className="h-4 w-4 data-[state=checked]:bg-[#5e6ad2] data-[state=checked]:border-[#5e6ad2]"
-                                    />
-                                    <span>No repository</span>
-                                  </CommandItem>
-
-                                  {form.getValues("agent_type") === "Fullstack" && Object.keys(repositories).length > 0 && (
-                                    <CommandItem
-                                      onSelect={() => {
-                                        // Get all repository IDs
-                                        const allRepoIds = Object.keys(repositories);
-                                        const currentRepos = form.getValues("repositories") || [];
-
-                                        // If all repos are already selected, deselect all and select "none"
-                                        if (allRepoIds.every(id => currentRepos.includes(id)) && !currentRepos.includes("none")) {
-                                          form.setValue("repositories", ["none"]);
-                                          setAllReposSelected(false);
-                                        } else {
-                                          // Otherwise, select all repos
-                                          form.setValue("repositories", allRepoIds);
-                                          setAllReposSelected(true);
-                                        }
-                                      }}
-                                      className="flex items-center space-x-2 select-all-option"
-                                    >
-                                      <Checkbox
-                                        checked={
-                                          Object.keys(repositories).every(id =>
-                                            isRepositorySelected(id) && !isRepositorySelected("none")
-                                          )
-                                        }
-                                        className="h-4 w-4 data-[state=checked]:bg-[#5e6ad2] data-[state=checked]:border-[#5e6ad2]"
-                                      />
-                                      <span className="font-medium">Select all repositories</span>
-                                    </CommandItem>
-                                  )}
-
-                                  {Object.entries(repositories).map(([id, repo]) => (
-                                    <CommandItem
-                                      key={id}
-                                      onSelect={() => handleRepositoryToggle(id)}
-                                      className="flex items-center space-x-2"
-                                    >
-                                      <Checkbox
-                                        checked={isRepositorySelected(id)}
-                                        className="h-4 w-4 data-[state=checked]:bg-[#5e6ad2] data-[state=checked]:border-[#5e6ad2]"
-                                      />
-                                      <span>{`${repo.owner}/${repo.repo}`}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
+                        <RepoSelectDropdown
+                          value={field.value || []}
+                          onChange={field.onChange}
+                          repositories={repositories}
+                          isLoading={isLoadingRepos}
+                          mode={mode}
+                          agentType={form.getValues("agent_type")}
+                          onRepositoryToggle={handleRepositoryToggle}
+                          isRepositorySelected={isRepositorySelected}
+                          getRepoDisplayName={getRepoDisplayName}
+                          allReposSelected={allReposSelected}
+                          setAllReposSelected={setAllReposSelected}
+                          formSetValue={form.setValue}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

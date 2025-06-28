@@ -8,6 +8,7 @@ import { MoreHorizontal, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskDetailsSidebar from "./TaskDetailsSidebar";
 import TaskLogsDialog from "./TaskLogsDialog";
+import TaskDetailsModal from "./TaskDetailsModal";
 import { useTasks } from "@/contexts/TaskContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -109,6 +110,8 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
   const [currentSubtaskIndex, setCurrentSubtaskIndex] = useState<number | null>(null);
   const [currentParentTaskId, setCurrentParentTaskId] = useState<string | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<Task | null>(null);
   const { tasks, isLoading, error, refreshTasks } = useTasks();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -343,13 +346,10 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     };
   }, [tasks, project]);
 
-  // Handle task click to show details sidebar
+  // Handle task click to show details modal
   const handleTaskClick = (task: Task) => {
-    // // Instead of navigating, show a toast notification
-    // toast({
-    //   title: "Task Selected",
-    //   description: "Task details view has been removed from the application.",
-    // });
+    setSelectedTaskForDetails(task);
+    setIsDetailsModalOpen(true);
   };
 
   // Handle task edit
@@ -644,6 +644,13 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
         onOpenChange={setIsTaskFormOpen}
         initialData={selectedTask}
         mode="edit"
+      />
+
+      {/* Task Details Modal */}
+      <TaskDetailsModal
+        task={selectedTaskForDetails}
+        open={isDetailsModalOpen}
+        onOpenChange={setIsDetailsModalOpen}
       />
     </div>
   );

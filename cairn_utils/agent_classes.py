@@ -137,6 +137,12 @@ class CodeEditorToolBox(DefaultToolBox):
         async def generate_output(input: dict) -> dict:
 
             output = SWEResponse(**input).model_dump()
+
+            # Generate branch URL if branch is available
+            if self.branch and self.owner and self.repo:
+                branch_url = f"https://github.com/{self.owner}/{self.repo}/tree/{self.branch}"
+                output["branch_url"] = branch_url
+
             output["end_task"] = True
             return output
 
@@ -153,6 +159,7 @@ class CodeEditorToolBox(DefaultToolBox):
                     - verification_status: Whether the changes were successfully verified
                     - error_messages: List of error messages encountered, if any
                     - additional_notes: Any additional notes about the implementation
+                    - branch_url: URL link to the GitHub branch (automatically generated)
 
             Returns:
                 SWEResponse: A structured response conforming to the SWEResponse schema.
