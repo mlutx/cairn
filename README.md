@@ -56,12 +56,21 @@ You can run Cairn locally, connect it to your github repos and use your favorite
 
 2. **Install dependencies**
 
-   **Using venv (recommended, but can use conda or system-wide installation as well)**
+   **Backend dependencies (Python):**
    ```bash
    python -m venv cairn-env
    source cairn-env/bin/activate  # On Windows: cairn-env\Scripts\activate
    pip install -r requirements.txt
    ```
+
+   **Frontend dependencies (Node.js):**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+   > **Note**: You'll need Node.js (version 16 or higher) and npm installed on your system.
 
 3. **Set up github access**
 
@@ -164,23 +173,41 @@ You can run Cairn locally, connect it to your github repos and use your favorite
 
 ### Running Cairn
 
+**Option 1: Using the startup script (recommended):**
+```bash
+./start-dev.sh
+```
+This script will start both the backend and frontend servers simultaneously and automatically open your browser.
+
+**Option 2: Manual startup (two terminals):**
+
+Terminal 1 - Backend:
 ```bash
 python fastapi_app/app.py
 ```
-Then, navigate to `http://0.0.0.0:8000` in your browser.
+
+Terminal 2 - Frontend:
+```bash
+cd frontend
+npm run dev
+```
+
+Then navigate to `http://localhost:5173/` in your browser.
+
+> **Note**: The web interface runs on port 5173 (frontend) which communicates with the FastAPI backend on port 8000.
 
 ---
 
 ### Your First Task
 
-1. **Access the interface** (via `http://0.0.0.0:8000`)
-2. **Select an agent type** (Fullstack Planner, PM, or SWE)
+1. Create a task by clicking "New Task" in the top right, or using ctrl+k.
+2. Add a task title, and describe your task.
+3. Select an agent type. There are 3 types to choose from:
 - SWE: recommended for simple self-contained subtasks. Output is a branch with the changes.
 - PM: recommended for slightly more complex subtasks. Delegates software changes to SWE. Output is a PR detailing the changes.
 - Fullstack Planner: recommended for fullstack or multi-step tasks. Output is a list of subtasks that can be ran in parallel, and who will communicate if necessary on cross-subtask code.
-3. **Choose target repositories** from your connected repos
-4. **Describe your task** in natural language
-5. **Monitor progress** through real-time logs and status updates
+4. Choose target repositories from your connected repos
+5. Monitor progress through real-time logs and status updates
 
 ---
 
