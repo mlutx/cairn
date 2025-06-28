@@ -3,7 +3,7 @@ interface ApiResponse<T> {
   error?: string;
 }
 
-export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api${endpoint}`, {
     ...options,
     headers: {
@@ -17,4 +17,4 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
   }
 
   return response.json();
-} 
+}
