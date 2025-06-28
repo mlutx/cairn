@@ -167,7 +167,7 @@ export default function TaskLogsDialog({
           </TabsList>
 
           <TabsContent value="logs" className="mt-0">
-            <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
+            <div className="bg-neutral-900 p-4 rounded-md overflow-auto max-h-96">
               {isLoading && logs.length === 0 ? (
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-3/4 bg-slate-800" />
@@ -186,10 +186,10 @@ export default function TaskLogsDialog({
                 <div className="space-y-3">
                   {logs.map((log, index) => (
                     <div key={index} className="border-b border-slate-700 pb-3 last:border-b-0">
-                      <div className="text-blue-300 text-xs font-medium mb-2">
+                      <div className="text-slate-300 text-[11px] font-medium mb-2">
                         [{new Date(log.created_at).toLocaleString()}] {log.agent_type}:
                       </div>
-                      <div className="pl-2 text-xs text-slate-100 font-mono break-all whitespace-pre-wrap max-w-full overflow-hidden">
+                      <div className="pl-2 text-[10px] text-slate-400 font-mono break-all whitespace-pre-wrap max-w-full overflow-hidden">
                         {typeof log.log_data === 'object'
                           ? JSON.stringify(log.log_data, null, 2)
                           : String(log.log_data)}
@@ -202,9 +202,9 @@ export default function TaskLogsDialog({
           </TabsContent>
 
           <TabsContent value="details" className="mt-0">
-            <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
+            <div className="bg-neutral-900 p-4 rounded-md overflow-auto max-h-96">
               {task ? (
-                <div className="text-xs text-slate-100 font-mono break-all whitespace-pre-wrap max-w-full overflow-hidden">
+                <div className="text-[10px] text-slate-400 font-mono break-all whitespace-pre-wrap max-w-full overflow-hidden">
                   {JSON.stringify(task, null, 2)}
                 </div>
               ) : (
