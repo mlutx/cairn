@@ -1,8 +1,16 @@
 import { Task } from "@/types";
 import { TaskStatus } from "@/types/task";
 
-// Map backend status to frontend status
-const mapAgentStatusToTaskStatus = (agentStatus: string): TaskStatus => {
+// Map backend status to frontend status with intelligent fullstack handling
+const mapAgentStatusToTaskStatus = (
+  agentStatus: string,
+  agentType: string,
+  agentOutput: any,
+  allTasks: any[],
+  currentTaskId: string
+): TaskStatus => {
+  // For non-fullstack tasks, use simple mapping
+  if (agentType !== 'Fullstack Planner') {
   switch (agentStatus) {
     case "Completed":
       return "Done";
@@ -20,6 +28,73 @@ const mapAgentStatusToTaskStatus = (agentStatus: string): TaskStatus => {
     default:
       return "Queued";
   }
+  }
+
+  // Intelligent fullstack task status
+  if (agentType === 'Fullstack Planner') {
+    switch (agentStatus) {
+      case "Running":
+        return "Running";
+      case "Queued":
+        return "Queued";
+      case "Failed":
+        return "Failed";
+      case "Completed":
+        // Check if this fullstack task has virtual subtasks available
+        const hasVirtualSubtasks =
+          agentOutput?.list_of_subtasks &&
+          Array.isArray(agentOutput.list_of_subtasks) &&
+          agentOutput.list_of_subtasks.length > 0;
+
+        if (hasVirtualSubtasks) {
+          // Find child tasks for this specific fullstack task
+          const childTasks = allTasks.filter(task =>
+            task.payload?.parent_fullstack_id === currentTaskId
+          );
+
+          // Check if any child tasks are running
+          const hasRunningSubtasks = childTasks.some(task =>
+            task.payload.agent_status === "Running" ||
+            task.payload.agent_status === "Queued" ||
+            task.payload.agent_status === "Subtasks Running"
+          );
+
+          if (hasRunningSubtasks) {
+            return "Running";
+          }
+
+          // Check if all virtual subtasks have been created as real tasks
+          const virtualSubtasksCount = agentOutput.list_of_subtasks.length;
+          const realSubtasksCount = childTasks.length;
+
+          // If we have fewer real tasks than virtual tasks, we're waiting for input
+          if (realSubtasksCount < virtualSubtasksCount) {
+            return "Waiting for Input";
+          }
+
+          // Check if all real subtasks are done
+          const allSubtasksDone = childTasks.length > 0 &&
+            childTasks.every(task =>
+              task.payload.agent_status === "Completed"
+            );
+
+          if (allSubtasksDone) {
+            return "Done";
+          }
+
+          // Some tasks exist but not all are done - still running
+          return "Running";
+        }
+
+        // No subtasks - just completed normally
+        return "Done";
+      default:
+        return "Queued";
+    }
+  }
+
+  // Fallback
+  return "Queued";
 };
 
 export async function fetchTasks(): Promise<Task[]> {
@@ -69,7 +144,7 @@ export async function fetchTasks(): Promise<Task[]> {
         id: run_id || item.task_id,
         title: title || (description ? description.split('\n')[0].substring(0, 50) : 'Untitled Task'),
         description: description || '',
-        status: mapAgentStatusToTaskStatus(agent_status),
+        status: mapAgentStatusToTaskStatus(agent_status, agent_type, agent_output, data, run_id || item.task_id),
         due_date: undefined,
         repos: reposArray,
         agent_type: agent_type === 'Fullstack Planner' ? 'Fullstack' : (agent_type || 'Unknown'),

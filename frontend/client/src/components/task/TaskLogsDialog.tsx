@@ -145,7 +145,7 @@ export default function TaskLogsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
             <span>{title}</span>
@@ -183,20 +183,20 @@ export default function TaskLogsDialog({
                   No logs found for this task yet.
                 </div>
               ) : (
-                <pre className="text-xs text-slate-100 whitespace-pre-wrap">
+                <div className="space-y-3">
                   {logs.map((log, index) => (
-                    <div key={index} className="mb-2">
-                      <strong className="text-blue-300">
+                    <div key={index} className="border-b border-slate-700 pb-3 last:border-b-0">
+                      <div className="text-blue-300 text-xs font-medium mb-2">
                         [{new Date(log.created_at).toLocaleString()}] {log.agent_type}:
-                      </strong>
-                      <div className="pl-2 mt-1">
+                      </div>
+                      <div className="pl-2 text-xs text-slate-100 font-mono break-all whitespace-pre-wrap max-w-full overflow-hidden">
                         {typeof log.log_data === 'object'
                           ? JSON.stringify(log.log_data, null, 2)
                           : String(log.log_data)}
                       </div>
                     </div>
                   ))}
-                </pre>
+                </div>
               )}
             </div>
           </TabsContent>
@@ -204,9 +204,9 @@ export default function TaskLogsDialog({
           <TabsContent value="details" className="mt-0">
             <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-96">
               {task ? (
-                <pre className="text-xs text-slate-100 whitespace-pre-wrap">
+                <div className="text-xs text-slate-100 font-mono break-all whitespace-pre-wrap max-w-full overflow-hidden">
                   {JSON.stringify(task, null, 2)}
-                </pre>
+                </div>
               ) : (
                 <div className="text-slate-400 text-sm">
                   No task details available.

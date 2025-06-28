@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { GridLoader } from "react-spinners";
 
 import sweAvatar from "@/assets/swe-icon.png";
 import pmAvatar from "@/assets/pm-icon.png";
@@ -131,6 +132,18 @@ export default function TaskCard({ task, onClick, className, expansionControl, o
       <div className="flex items-start justify-between">
         <h3 className="font-medium text-sm">{task.title}</h3>
         <div className="flex items-center gap-2">
+          {task.status === "Running" && (
+            <div className="flex items-center justify-center">
+              <GridLoader
+                size={4}
+                margin={1}
+                color="#5d70d5"
+                loading={true}
+                cssOverride={{}}
+                speedMultiplier={1}
+              />
+            </div>
+          )}
           {onViewLogs && (
             <Button
               variant="ghost"
@@ -189,13 +202,13 @@ export default function TaskCard({ task, onClick, className, expansionControl, o
 
           {/* Run All Child Tasks button for Fullstack tasks */}
           {task.agent_type === "Fullstack" &&
-           task.status === "Done" &&
+           (task.status === "Done" || task.status === "Waiting for Input") &&
            onRunAllChildTasks &&
            hasVirtualSubtasks && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground ml-2"
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground ml-4 border border-[#5d70d5] border-opacity-30 hover:border-opacity-50"
               onClick={(e) => {
                 e.stopPropagation();
                 onRunAllChildTasks(task);
@@ -204,9 +217,15 @@ export default function TaskCard({ task, onClick, className, expansionControl, o
               title="Run All Child Tasks"
             >
               {isCreatingAllSubtasks ? (
-                <span className="animate-spin text-xs">⟳</span>
+                <>
+                  <span className="animate-spin text-xs mr-1">⟳</span>
+                  Creating...
+                </>
               ) : (
-                <span>▶</span>
+                <>
+                  <span className="mr-1">▶</span>
+                  Run All
+                </>
               )}
             </Button>
           )}

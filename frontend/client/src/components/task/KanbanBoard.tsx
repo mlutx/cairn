@@ -81,7 +81,7 @@ const isChildTask = (task: Task): boolean => {
 const hasSubtasksInOutput = (task: Task): boolean => {
   return (
     task.agent_type === "Fullstack" &&
-    task.status === "Done" &&
+    (task.status === "Done" || task.status === "Waiting for Input") &&
     !!task.agent_output &&
     !!task.agent_output.list_of_subtasks &&
     Array.isArray(task.agent_output.list_of_subtasks) &&
@@ -411,9 +411,9 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
     // Create a custom expansion control component that includes our play button
     const customExpansionControl = (
       <Button
-        size="icon"
-        variant="outline"
-        className="h-6 w-6 text-xs mr-2 border border-blue-500 hover:bg-blue-500/10"
+        size="sm"
+        variant="ghost"
+        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground border border-[#5d70d5] border-opacity-30 hover:border-opacity-50"
         onClick={(e) => {
           e.stopPropagation();
           createSubtask(subtask.parentTaskId, subtask.index);
@@ -421,9 +421,17 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
         disabled={isCurrentlyCreating}
         title="Run Task"
       >
-        {isCurrentlyCreating ?
-          <span className="animate-spin">⟳</span> :
-          <span className="text-blue-500">▶</span>}
+        {isCurrentlyCreating ? (
+          <>
+            <span className="animate-spin text-xs mr-1">⟳</span>
+            Creating...
+          </>
+        ) : (
+          <>
+            <span className="mr-1">▶</span>
+            Run
+          </>
+        )}
       </Button>
     );
 
@@ -568,20 +576,6 @@ export default function KanbanBoard({ project }: KanbanBoardProps) {
               isCreatingAllSubtasks={false}
               hasVirtualSubtasks={false}
             />
-            {canRun && (
-              <div className="absolute top-2 right-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    runSubtask(childTask.id);
-                  }}
-                >
-                  Run Task
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* Render this child's children if expanded */}
