@@ -1,37 +1,39 @@
 
 <div align="center">
 
-![Cairn Logo](static/docs/images/cairn-logo.png)
+![Cairn Logo](static/docs/images/cairn-logo.png?cachebust=1)
 
 *Github-integrated background agents, automating end-to-end software engineering,  fully open source.*
 
-
+[![AI Agents](https://img.shields.io/badge/AI-Agents-FF6B6B.svg)](https://github.com/cairn-dev/cairn)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688.svg)](https://fastapi.tiangolo.com/)
-[![Contributing](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](.github/CONTRIBUTING.md)
+[![GitHub stars](https://img.shields.io/github/stars/cairn-dev/cairn?style=social)](https://github.com/cairn-dev/cairn/stargazers)
 
-[🚀 Quick Start](#-quick-start) | [📖 Documentation](https://try-cairn.com) | [<img src="https://logos-world.net/wp-content/uploads/2020/12/Discord-Emblem.png" alt="Discord" width="30" height="15" style="position:relative; top:3px; margin-right:-7px;"/> Discord](https://discord.gg/C67EdrKN) | [🐛 Issues](https://github.com/cairn-dev/cairn/issues) | [🤝 Contributing](.github/CONTRIBUTING.md)
+
+[🚀 Quick Start](#quick-start) | [📖 Documentation](https://try-cairn.com) | [<img src="https://logos-world.net/wp-content/uploads/2020/12/Discord-Emblem.png" alt="Discord" width="30" height="15" style="position:relative; top:3px; margin-left:-7px; margin-right:-7px;"/> Discord](https://discord.gg/Svexhc6zpD) | [⭐ Support Us](https://github.com/cairn-dev/cairn) | [🤝 Contributing](.github/CONTRIBUTING.md)
 
 </div>
 
-## 🪨 What is Cairn?
+### 🪨 What is Cairn?
 
-Cairn is a simple open-source background-agent system for coding. Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
+Cairn is a simple open-source background-agent system for coding, built in the style of a product management tool.
+Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
 You can run Cairn locally, connect it to your github repos and use your favorite LLM to execute fullstack tasks, 100% in the background. Save time for the things you want to do by automating the boring stuff!
 
-![Cairn Demo](static/docs/images/demo1.gif)
+![Cairn Demo](static/docs/images/demo1.gif?cachebust=1)
+
 
 
 | Provider | Status | Models |
 |----------|--------|---------|
-| 🟢 **Anthropic** | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
-| 🟢 **OpenAI** | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
-| 🟢 **Gemini** | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
-| 🟡 **Deepseek** | 🚧 Coming Soon |
-| 🟡 **Llama** | 🚧 Coming Soon |
+| <img src="frontend/client/src/assets/anthropic.png" alt="Anthropic" height="20" style="vertical-align: middle;">&nbsp;&nbsp;&nbsp;&nbsp;Anthropic | ✅ Supported | Claude Sonnet 4, Claude Sonnet 3.7, Claude Sonnet 3.5, etc |
+| <img src="frontend/client/src/assets/openai.png" alt="OpenAI" height="20" style="vertical-align: middle;">&nbsp;&nbsp;&nbsp;&nbsp;OpenAI | ✅ Supported | GPT-4.1, GPT-4o, GPT-4, GPT-3.5-Turbo, etc |
+| <img src="frontend/client/src/assets/gemini.png" alt="Gemini" height="20" style="vertical-align: middle;">&nbsp;&nbsp;&nbsp;&nbsp;Gemini | ✅ Supported | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, etc |
+| <img src="frontend/client/src/assets/deepseek-logo.png" alt="Deepseek" height="15" style="vertical-align: middle;">&nbsp;&nbsp;&nbsp;&nbsp;Deepseek | 🚧 Coming Soon |
+| <img src="frontend/client/src/assets/llama.png" alt="Llama" height="13" style="vertical-align: middle;">&nbsp;&nbsp;&nbsp;&nbsp;Llama | 🚧 Coming Soon |
 
-## Table of Contents
+<!-- ## Table of Contents
 
 - [What is Cairn?](#-what-is-cairn)
   - [Model Support](#model-support)
@@ -42,11 +44,10 @@ You can run Cairn locally, connect it to your github repos and use your favorite
   - [Project Structure](#project-structure)
   - [Contributing](#contributing)
 - [License](#license)
-- [Roadmap](#roadmap)
+- [Roadmap](#roadmap) -->
 
 ## Quick Start
 
-### Installation
 
 1. **Clone or fork the repository**
    ```bash
