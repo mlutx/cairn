@@ -73,41 +73,7 @@ class CodeEditorToolBox(DefaultToolBox):
             other_agents=other_agents,
             running_locally=running_locally,
         )
-        self.branch_created = False
-
-    async def authenticate(self):
-        """
-        Authenticate with GitHub and ensure the specified branch exists.
-        If the branch doesn't exist, creates it based on the default branch.
-        """
-        # First get the installation token
-        await super().authenticate()
-
-        # Check if a branch is specified and ensure it exists
-        if self.branch and not self.branch_created:
-            try:
-                # Try to list files in the branch to see if it exists
-                await list_files_in_repo(
-                    self.installation_token,
-                    self.owner,
-                    self.repo,
-                    "",
-                    branch=self.branch,
-                )
-                print(f"Branch '{self.branch}' already exists.")
-            except Exception as e:
-                if "404" in str(e):  # Branch doesn't exist
-                    # print(f"Branch '{self.branch}' doesn't exist. Creating it now...")
-                    await create_branch_from_default(
-                        self.installation_token, self.owner, self.repo, self.branch
-                    )
-                    # print(f"Branch '{self.branch}' created successfully.")
-                    self.branch_created = True
-                else:
-                    # If it's another error, just log it and continue
-                    print(f"Warning: Error checking branch: {str(e)}")
-        if not self.branch:
-            raise ValueError("No branch specified for code editor tool box")
+        self.requires_branch = True
 
     def get_all_tools(self):
         """
@@ -194,40 +160,8 @@ class ManagerToolBox(DefaultToolBox):
             other_agents=other_agents,
             running_locally=running_locally,
         )
-        self.branch_created = False
         self.parent_run_id = parent_run_id  # Store the parent task's run_id for linking
-
-    async def authenticate(self):
-        """
-        Authenticate with GitHub and ensure the specified branch exists.
-        If the branch doesn't exist, creates it based on the default branch.
-        """
-        # First get the installation token
-        await super().authenticate()
-
-        # Check if a branch is specified and ensure it exists
-        if self.branch and not self.branch_created:
-            try:
-                # Try to list files in the branch to see if it exists
-                await list_files_in_repo(
-                    self.installation_token,
-                    self.owner,
-                    self.repo,
-                    "",
-                    branch=self.branch,
-                )
-                print(f"Branch '{self.branch}' already exists.")
-            except Exception as e:
-                if "404" in str(e):  # Branch doesn't exist
-                    print(f"Branch '{self.branch}' doesn't exist. Creating it now...")
-                    await create_branch_from_default(
-                        self.installation_token, self.owner, self.repo, self.branch
-                    )
-                    print(f"Branch '{self.branch}' created successfully.")
-                    self.branch_created = True
-                else:
-                    # If it's another error, just log it and continue
-                    print(f"Warning: Error checking branch: {str(e)}")
+        self.requires_branch = True
 
     def get_all_tools(self):
         """
@@ -324,14 +258,38 @@ class ManagerToolBox(DefaultToolBox):
                         )
                     except Exception as e:
                         # Add PR error to the response but don't fail
-                        if response_dict.get("issues_encountered"):
-                            response_dict["issues_encountered"].append(
-                                f"Failed to create PR: {str(e)}"
+                        error_message = str(e)
+                        fallback_suggestion = ""
+
+                        # Provide more specific error messages and fallback suggestions
+                        if "422 Unprocessable Entity" in error_message:
+                            fallback_suggestion = (
+                                "This typically happens when: 1) A PR already exists for this branch, "
+                                "2) There are no changes in the branch, or 3) The PR data is invalid. "
+                                "Try creating the PR manually through the GitHub UI or CLI using: "
+                                f"gh pr create --base main --head {self.branch} --title \"{pr_title}\""
+                            )
+                        elif "404" in error_message:
+                            fallback_suggestion = (
+                                f"The branch '{self.branch}' might not exist or you might not have permission. "
+                                "Verify the branch exists with 'git branch -a' and check your permissions."
                             )
                         else:
-                            response_dict["issues_encountered"] = [
-                                f"Failed to create PR: {str(e)}"
-                            ]
+                            fallback_suggestion = (
+                                "Try creating the PR manually through the GitHub UI or using the GitHub CLI."
+                            )
+
+                        detailed_error = f"Failed to create PR: {error_message}\nFallback: {fallback_suggestion}"
+
+                        if response_dict.get("issues_encountered"):
+                            response_dict["issues_encountered"].append(detailed_error)
+                        else:
+                            response_dict["issues_encountered"] = [detailed_error]
+
+                        # Add branch info to make manual PR creation easier
+                        response_dict["branch_name"] = self.branch
+                        if self.owner and self.repo:
+                            response_dict["branch_url"] = f"https://github.com/{self.owner}/{self.repo}/tree/{self.branch}"
 
                 response_dict["end_task"] = True
                 return response_dict
