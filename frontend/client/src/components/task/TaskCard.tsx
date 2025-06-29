@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { GridLoader } from "react-spinners";
+import React from "react";
 
 import sweAvatar from "@/assets/swe-icon.png";
 import pmAvatar from "@/assets/pm-icon.png";
@@ -77,7 +78,7 @@ const mockLogs = {
   ]
 };
 
-export default function TaskCard({ task, onClick, className, expansionControl, onViewLogs, onDeleteTask, onRunAllChildTasks, isCreatingAllSubtasks, hasVirtualSubtasks }: TaskCardProps) {
+function TaskCard({ task, onClick, className, expansionControl, onViewLogs, onDeleteTask, onRunAllChildTasks, isCreatingAllSubtasks, hasVirtualSubtasks }: TaskCardProps) {
   // Debug logging
   console.log(`[TaskCard-${task.id}] Render`);
 
@@ -246,3 +247,5 @@ export default function TaskCard({ task, onClick, className, expansionControl, o
     </div>
   );
 }
+
+export default React.memo(TaskCard);

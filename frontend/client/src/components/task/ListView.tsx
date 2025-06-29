@@ -118,7 +118,7 @@ const columns = [
   { id: 'agent_type', label: 'Agent Type', sortable: true },
   { id: 'repos', label: 'Repositories', sortable: false },
   { id: 'created_at', label: 'Created', sortable: true },
-  { id: 'due_date', label: 'Due Date', sortable: true },
+  { id: 'updated_at', label: 'Updated', sortable: true },
   { id: 'actions', label: 'Actions', sortable: false },
 ];
 
@@ -130,6 +130,30 @@ const isChildTask = (task: Task): boolean => {
 interface ListViewProps {
   project?: string;
 }
+
+// Small square spinner component
+function SmallSquareSpinner() {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        width: 12,
+        height: 12,
+        border: '2px solid #5d70d5',
+        borderRadius: 2,
+        borderTop: '2px solid transparent',
+        animation: 'spin 0.7s linear infinite',
+        marginLeft: 8,
+        verticalAlign: 'middle',
+      }}
+    />
+  );
+}
+
+// Add keyframes for spin animation
+const style = document.createElement('style');
+style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
+document.head.appendChild(style);
 
 export default function ListView({ project = "" }: ListViewProps) {
   const { toast } = useToast();
@@ -375,6 +399,9 @@ export default function ListView({ project = "" }: ListViewProps) {
                 )}
                 {/* Always render the title */}
                 {childTask.title}
+                {childTask.status === "Running" && (
+                  <SmallSquareSpinner />
+                )}
               </div>
             </div>
           </TableCell>
@@ -412,7 +439,7 @@ export default function ListView({ project = "" }: ListViewProps) {
           </TableCell>
           <TableCell className="text-sm">{format(new Date(childTask.created_at), "MMM d, yyyy")}</TableCell>
           <TableCell className="text-sm pr-6">
-            {childTask.due_date ? format(new Date(childTask.due_date), "MMM d, yyyy") : "-"}
+            {childTask.updated_at ? format(new Date(childTask.updated_at), "MMM d, yyyy") : "-"}
           </TableCell>
           <TableCell className="text-right">
             <div className="flex justify-end space-x-1">
@@ -625,7 +652,7 @@ export default function ListView({ project = "" }: ListViewProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="created_at">Created Date</SelectItem>
-                    <SelectItem value="due_date">Due Date</SelectItem>
+                    <SelectItem value="updated_at">Updated Date</SelectItem>
                     <SelectItem value="title">Title</SelectItem>
                     <SelectItem value="status">Status</SelectItem>
                     <SelectItem value="agent_type">Agent Type</SelectItem>
@@ -699,11 +726,11 @@ export default function ListView({ project = "" }: ListViewProps) {
                     </TableHead>
                     <TableHead
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleSort('due_date')}
+                      onClick={() => handleSort('updated_at')}
                     >
                       <div className="flex items-center">
-                        Due Date
-                        {getSortIcon('due_date')}
+                        Updated
+                        {getSortIcon('updated_at')}
                       </div>
                     </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -735,6 +762,9 @@ export default function ListView({ project = "" }: ListViewProps) {
                                 </Button>
                               )}
                               {task.title}
+                              {task.status === "Running" && (
+                                <SmallSquareSpinner />
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -772,7 +802,7 @@ export default function ListView({ project = "" }: ListViewProps) {
                         </TableCell>
                         <TableCell className="text-sm">{format(new Date(task.created_at), "MMM d, yyyy")}</TableCell>
                         <TableCell className="text-sm pr-6">
-                          {task.due_date ? format(new Date(task.due_date), "MMM d, yyyy") : "-"}
+                          {task.updated_at ? format(new Date(task.updated_at), "MMM d, yyyy") : "-"}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end space-x-1">

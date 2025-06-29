@@ -8,6 +8,7 @@ __pycache__/
 
 .next/
 
+/logs
 
 repos.json
 cairn-env/
