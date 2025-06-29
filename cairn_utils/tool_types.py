@@ -551,8 +551,9 @@ class EditSuggestionsParams(BaseModel):
     file_path: str = Field(
         description="The path to the file to edit, relative to the repository root."
     )
-    edit: str = Field(
-        description="Changes to make to the file, in the format of the actual code with comments explaining new blocks, and comments abstracting out unchanged code."
+    edit: Optional[str] = Field(
+        default=None,
+        description="Changes to make to the file, in the format of the actual code with comments explaining new blocks, and comments abstracting out unchanged code. If not provided and the file doesn't exist, a blank file will be created."
     )
 
 class EditFilesParams(BaseModel):

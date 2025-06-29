@@ -679,6 +679,7 @@ class DefaultToolBox:
 
             try:
                 # Read the current file content
+                file_exists = True
                 try:
                     original_content = await read_file_from_repo(
                         self.installation_token,
@@ -690,7 +691,46 @@ class DefaultToolBox:
                 except Exception:
                     # If file doesn't exist, start with blank content (creating new file)
                     original_content = ""
+                    file_exists = False
                     # print(f"File '{file_path}' doesn't exist, creating new file with blank content")
+
+                # If no edit suggestions provided
+                if edit_suggestions is None:
+                    # If file exists, return helpful error message
+                    if file_exists:
+                        return {
+                            "success": False,
+                            "error": f"The file '{file_path}' already exists. You must provide the 'edit' parameter with your changes. Use the read_file tool first to see the current content.",
+                            "file_exists": True,
+                            "hint": "Use the read_file tool to see the current content before making changes."
+                        }
+                    else:
+                        # Create a new blank file
+                        # Use the current branch if it's set, otherwise use the default branch
+                        target_branch = self.branch
+                        if not target_branch:
+                            default_branch, _ = await get_default_branch_sha(
+                                self.installation_token, self.owner, self.repo
+                            )
+                            target_branch = default_branch
+
+                        # Apply the changes using batch_update_files
+                        path_to_changes = {file_path: {"new_content": ""}}
+
+                        results = await batch_update_files(
+                            self.installation_token,
+                            self.owner,
+                            self.repo,
+                            target_branch,
+                            path_to_changes,
+                        )
+
+                        return {
+                            "success": True,
+                            "message": f"Successfully created new blank file at {file_path}",
+                            "modified_files_count": results["modified_files_count"],
+                            "modified_files_content": results["modified_files_content"],
+                        }
 
                 # find associated LLM client given model name...
                 provider, model_info = find_supported_model_given_model_name(self.model_name)
@@ -773,25 +813,25 @@ class DefaultToolBox:
                 }
 
         description = """
-            Apply edits to a file using natural language suggestions.
+            Apply edits to a file using natural language suggestions or create a new file.
 
-            Your edits should be formatted to include code snippets in the following format to show exactly what the new code should look like while abstracting out unchanged code:
-            You can additionally include bullet points, comments, etc. But you should be INSANELY detailed and specific about what you want to change, such that someone can change the file without any other additional context.
-
-            Key guidelines for edit suggestions:
+            - Your edits can be formatted to include code snippets showing exactly what the new code should look like while abstracting out unchanged code
+            - Be VERY detailed and specific about what you want to change
+            - If you fail to apply the edits, instead of using code blocks, use more natural-language based edit descriptions.
             - Use "// ... existing code ..." (or equivalent comment syntax based on the language) to represent unchanged code
-            - Only include the specific code sections that need to be modified or added, and other bits of code as context for where to apply the change.
-            - You can include multiple code chunks in your suggestions, but make sure to include the context for where to apply the change.
-            - The tool will intelligently apply your changes while preserving the rest of the file.
+            - Only include the specific code sections that need to be modified or added, and other bits of code as context for where to apply the change
+            - You can include multiple code chunks in your suggestions, but make sure to include the context for where to apply the change
+            - If the file doesn't exist and you only provide the file_path parameter (no edit), a blank file will be created
+            - If you want to create a file with content, provide both 'file_path' and 'edit' parameters
 
             Args:
-                file_path: The path to the file to edit, relative to the repository root
-                edit: A string showing new code, edited code, etc.
+                file_path: The path to the file to edit or create, relative to the repository root
+                edit: Changes to make to the file in natural language + code blocks.
 
             Returns:
                 dict: Success status, message, and details about the changes made
 
-            This tool is best used for large complex rewrites.
+            This tool is best used for large complex rewrites or creating new files.
             """
         function_name = "edit_file_descriptively"
         function_schema = EditSuggestionsParams.model_json_schema()
