@@ -32,8 +32,17 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Use our task service to get tasks from the API
       const fetchedTasks = await apiFetchTasks();
-      setTasks(fetchedTasks);
       setError(null);
+      // Only update if changed (shallow compare by id and status)
+      setTasks(prevTasks => {
+        if (
+          prevTasks.length === fetchedTasks.length &&
+          prevTasks.every((t, i) => t.id === fetchedTasks[i].id && t.status === fetchedTasks[i].status)
+        ) {
+          return prevTasks;
+        }
+        return fetchedTasks;
+      });
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch tasks'));
       console.error('Error fetching tasks:', err);
