@@ -211,9 +211,21 @@ async def wrapper(payload: dict) -> dict:
     branch = None
     if agent_type in ["SWE", "PM"]:
         if not payload.get("branch"):
+            branch = run_id
             timestamp = int(time.time())
-            branch = f"{agent_type.lower()}-{timestamp}"
             payload["branch"] = branch
+
+            # Log branch info to JSON file
+            branch_info = {
+                "timestamp": timestamp,
+                "agent_type": agent_type,
+                "branch": branch,
+                "run_id": run_id
+            }
+            # branch_log_file = f"BRANCH_INFO_{timestamp}_{branch}.json"
+            # with open(branch_log_file, "w") as f:
+            #     json.dump(branch_info, f, indent=2)
+            # logger.info(f"Branch info logged to {branch_log_file}")
         else:
             branch = payload.get("branch")
 

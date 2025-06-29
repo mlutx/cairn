@@ -26,6 +26,7 @@ from github_utils import (
     read_file_from_repo,
     search_files_by_name,
     search_repo_code,
+    create_branch_from_default,
 )
 from task_storage import TaskStorage
 
@@ -111,6 +112,7 @@ class DefaultToolBox:
         self._load_cairn_settings()
         self.repo_memory = {}
         self._load_cairn_repo_memory()
+        self.branch_created = False
 
     def _get_cairn_dir(self) -> str:
         """
@@ -124,13 +126,45 @@ class DefaultToolBox:
         return os.path.join(parent_dir, ".cairn")
 
     async def authenticate(self):
+        """
+        Authenticate with GitHub and ensure the specified branch exists.
+        If the branch doesn't exist, creates it based on the default branch.
+        """
+        # Get the installation token
         self.jwt_token = generate_jwt()
         self.installation_token = await get_installation_token(
             self.jwt_token, self.installation_id
         )
-        # print(
-        #     # f"DefaultToolBox: Successfully authenticated with GitHub API for {self.owner}"
-        # )
+
+        # Check if a branch is specified and ensure it exists
+        if self.branch and not self.branch_created:
+            try:
+                # Try to list files in the branch to see if it exists
+                await list_files_in_repo(
+                    self.installation_token,
+                    self.owner,
+                    self.repo,
+                    "",
+                    branch=self.branch,
+                )
+                print(f"Branch '{self.branch}' already exists.")
+            except Exception as e:
+                if "404" in str(e):  # Branch doesn't exist
+                    try:
+                        await create_branch_from_default(
+                            self.installation_token, self.owner, self.repo, self.branch
+                        )
+                        self.branch_created = True
+                    except Exception as E:
+                        print(f'Error creating branch with name: {self.branch} with error code: {E}')
+                    print(f"Branch '{self.branch}' created successfully.")
+                else:
+                    # If it's another error, just log it and continue
+                    print(f"Warning: Error checking branch: {str(e)}")
+
+        # Some toolboxes require a branch to be specified
+        if hasattr(self, 'requires_branch') and self.requires_branch and not self.branch:
+            raise ValueError(f"No branch specified for {self.__class__.__name__}")
 
     def get_batch_tool_call_tool(self, tool_name_2_function: dict):
         async def batch_tool(params: dict) -> dict:
