@@ -106,16 +106,6 @@ https://github.com/user-attachments/assets/1c7a2ca8-9552-4835-89a4-fc51e2ceb4a0
 
    4. Click **"Create GitHub App"** to finish
 
-   ```
-   Step 2: Gather your credentials and install the app (3 required values)
-   ```
-   ```
-   • App ID: Copy from app settings page (displayed at top)
-   • Private Key: Generate and download .pem file → save to cairn project root
-   • Installation ID: Click "Install App" → Select repositories → Install
-     Then check browser URL: https://github.com/settings/installations/[INSTALLATION_ID]
-   ```
-
    ### Step 3: Note your credentials for .env and repos.json configuration
 
    You'll need these three values for your configuration:
