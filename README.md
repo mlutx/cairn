@@ -3,7 +3,7 @@
 
 ![Cairn Logo](static/docs/images/cairn-logo.png?cachebust=1)
 
-*Github-integrated background agents, automating end-to-end software engineering,  fully open source.*
+*Github-integrated background agents, automating end-to-end software engineering, fully open source.*
 
 [![AI Agents](https://img.shields.io/badge/AI-Agents-FF6B6B.svg)](https://github.com/cairn-dev/cairn)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
