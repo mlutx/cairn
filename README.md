@@ -3,7 +3,7 @@
 
 ![Cairn Logo](static/docs/images/cairn-logo.png?cachebust=1)
 
-*Github-integrated background agents, automating end-to-end software engineering,  fully open source.*
+*Github-integrated background agents, automating end-to-end software engineering, fully open source.*
 
 [![AI Agents](https://img.shields.io/badge/AI-Agents-FF6B6B.svg)](https://github.com/cairn-dev/cairn)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -21,9 +21,7 @@ Cairn is a simple open-source background-agent system for coding, built in the s
 Think [Codex](https://openai.com/index/introducing-codex/), [Jules](https://jules.google/), or [Cursor Background Agents](https://docs.cursor.com/background-agent), but open sourced!
 You can run Cairn locally, connect it to your github repos and use your favorite LLM to execute fullstack tasks, 100% in the background. Save time for the things you want to do by automating the boring stuff!
 
-![Cairn Demo](static/docs/images/demo1.gif?cachebust=1)
-
-
+https://github.com/user-attachments/assets/1c7a2ca8-9552-4835-89a4-fc51e2ceb4a0
 
 | Provider | Status | Models |
 |----------|--------|---------|
@@ -107,16 +105,6 @@ You can run Cairn locally, connect it to your github repos and use your favorite
    ```
 
    4. Click **"Create GitHub App"** to finish
-
-   ```
-   Step 2: Gather your credentials and install the app (3 required values)
-   ```
-   ```
-   • App ID: Copy from app settings page (displayed at top)
-   • Private Key: Generate and download .pem file → save to cairn project root
-   • Installation ID: Click "Install App" → Select repositories → Install
-     Then check browser URL: https://github.com/settings/installations/[INSTALLATION_ID]
-   ```
 
    ### Step 3: Note your credentials for .env and repos.json configuration
 
