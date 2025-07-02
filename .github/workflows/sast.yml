@@ -1,0 +1,88 @@
+name: SAST Security Scans
+
+on:
+  push:
+    branches: [ main, develop ] # Adjust to your main branches
+  pull_request:
+    branches: [ main, develop ] # Adjust to your main branches
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  sast_scan:
+    name: Perform SAST Scans
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # Use the project's Python version
+
+      - name: Install Python dependencies (for Bandit context if needed)
+        run: |
+          python -m venv env
+          source env/bin/activate
+          pip install -r requirements.txt # Or a specific requirements-dev.txt if it exists
+
+      - name: Install Bandit
+        run: |
+          source env/bin/activate
+          pip install bandit
+
+      - name: Run Bandit scan (Python)
+        id: bandit_scan
+        run: |
+          source env/bin/activate
+          # Scan the entire repository, exclude virtual environment folders
+          # Output in JSON format to bandit-report.json
+          # '|| true' ensures the step passes even if vulnerabilities are found,
+          # allowing the report to be uploaded or processed.
+          # Remove '|| true' to make the build fail on found vulnerabilities.
+          bandit -r . -x ./env,./.venv,./venv -f json -o bandit-report.json --quiet || true
+        continue-on-error: true # Another way to ensure workflow continues
+
+      - name: Upload Bandit report
+        if: always() # Ensure this runs even if the previous step 'failed' (due to found issues)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-sast-report
+          path: bandit-report.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Use the project's Node.js version
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run ESLint scan (Frontend)
+        id: eslint_scan
+        working-directory: ./frontend
+        # This command assumes your 'npm run lint' script is configured
+        # with ESLint and any security plugins.
+        # Adjust if you have a specific script like 'npm run lint:security'.
+        # '|| true' ensures the step passes even if linting issues (including security) are found.
+        # Remove '|| true' to make the build fail on found issues.
+        run: npm run lint || true
+        continue-on-error: true # Ensure workflow continues
+
+      # Optional: Upload ESLint report if your lint setup produces a file
+      # - name: Upload ESLint report
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: eslint-sast-report
+      #     path: ./frontend/eslint-report.json # Adjust path as needed
+
+      - name: Check for SAST issues (Fail build if issues found - Example)
+        if: steps.bandit_scan.outcome == 'failure' || steps.eslint_scan.outcome == 'failure' # Adjust step IDs if you change them
+        run: |
+          echo "SAST scans found issues. Failing the build."
+          # exit 1 # Uncomment to actually fail the build
+        # Note: The 'continue-on-error: true' on scan steps means they won't directly fail the job.
+        # This step provides a way to explicitly fail the job if scans find issues and you want that behavior.
+        # For a less strict approach, remove this step and rely on reviewing artifacts.
